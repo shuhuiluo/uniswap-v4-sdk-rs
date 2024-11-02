@@ -317,79 +317,34 @@ struct RouterAction {
     encoded_input: Bytes,
 }
 
+macro_rules! router_action {
+    ($action:expr, $params:expr) => {
+        RouterAction {
+            action: $action,
+            encoded_input: $params.abi_encode().into(),
+        }
+    };
+}
+
 fn create_action(action: Actions) -> RouterAction {
     match action {
-        Actions::INCREASE_LIQUIDITY(params) => RouterAction {
-            action: 0x00,
-            encoded_input: params.abi_encode().into(),
-        },
-        Actions::DECREASE_LIQUIDITY(params) => RouterAction {
-            action: 0x01,
-            encoded_input: params.abi_encode().into(),
-        },
-        Actions::MINT_POSITION(params) => RouterAction {
-            action: 0x02,
-            encoded_input: params.abi_encode().into(),
-        },
-        Actions::BURN_POSITION(params) => RouterAction {
-            action: 0x03,
-            encoded_input: params.abi_encode().into(),
-        },
-        Actions::SWAP_EXACT_IN_SINGLE(params) => RouterAction {
-            action: 0x04,
-            encoded_input: params.abi_encode().into(),
-        },
-        Actions::SWAP_EXACT_IN(params) => RouterAction {
-            action: 0x05,
-            encoded_input: params.abi_encode().into(),
-        },
-        Actions::SWAP_EXACT_OUT_SINGLE(params) => RouterAction {
-            action: 0x06,
-            encoded_input: params.abi_encode().into(),
-        },
-        Actions::SWAP_EXACT_OUT(params) => RouterAction {
-            action: 0x07,
-            encoded_input: params.abi_encode().into(),
-        },
-        Actions::SETTLE(params) => RouterAction {
-            action: 0x09,
-            encoded_input: params.abi_encode().into(),
-        },
-        Actions::SETTLE_ALL(params) => RouterAction {
-            action: 0x10,
-            encoded_input: params.abi_encode().into(),
-        },
-        Actions::SETTLE_PAIR(params) => RouterAction {
-            action: 0x11,
-            encoded_input: params.abi_encode().into(),
-        },
-        Actions::TAKE(params) => RouterAction {
-            action: 0x12,
-            encoded_input: params.abi_encode().into(),
-        },
-        Actions::TAKE_ALL(params) => RouterAction {
-            action: 0x13,
-            encoded_input: params.abi_encode().into(),
-        },
-        Actions::TAKE_PORTION(params) => RouterAction {
-            action: 0x14,
-            encoded_input: params.abi_encode().into(),
-        },
-        Actions::TAKE_PAIR(params) => RouterAction {
-            action: 0x15,
-            encoded_input: params.abi_encode().into(),
-        },
-        Actions::SETTLE_TAKE_PAIR(params) => RouterAction {
-            action: 0x16,
-            encoded_input: params.abi_encode().into(),
-        },
-        Actions::CLOSE_CURRENCY(params) => RouterAction {
-            action: 0x17,
-            encoded_input: params.abi_encode().into(),
-        },
-        Actions::SWEEP(params) => RouterAction {
-            action: 0x19,
-            encoded_input: params.abi_encode().into(),
-        },
+        Actions::INCREASE_LIQUIDITY(params) => router_action!(0x00, params),
+        Actions::DECREASE_LIQUIDITY(params) => router_action!(0x01, params),
+        Actions::MINT_POSITION(params) => router_action!(0x02, params),
+        Actions::BURN_POSITION(params) => router_action!(0x03, params),
+        Actions::SWAP_EXACT_IN_SINGLE(params) => router_action!(0x04, params),
+        Actions::SWAP_EXACT_IN(params) => router_action!(0x05, params),
+        Actions::SWAP_EXACT_OUT_SINGLE(params) => router_action!(0x06, params),
+        Actions::SWAP_EXACT_OUT(params) => router_action!(0x07, params),
+        Actions::SETTLE(params) => router_action!(0x09, params),
+        Actions::SETTLE_ALL(params) => router_action!(0x10, params),
+        Actions::SETTLE_PAIR(params) => router_action!(0x11, params),
+        Actions::TAKE(params) => router_action!(0x12, params),
+        Actions::TAKE_ALL(params) => router_action!(0x13, params),
+        Actions::TAKE_PORTION(params) => router_action!(0x14, params),
+        Actions::TAKE_PAIR(params) => router_action!(0x15, params),
+        Actions::SETTLE_TAKE_PAIR(params) => router_action!(0x16, params),
+        Actions::CLOSE_CURRENCY(params) => router_action!(0x17, params),
+        Actions::SWEEP(params) => router_action!(0x19, params),
     }
 }
