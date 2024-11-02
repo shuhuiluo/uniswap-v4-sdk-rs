@@ -1,28 +1,31 @@
 use crate::prelude::{Pool, Route};
-use alloy_primitives::{aliases::U24, Address, Bytes};
+use alloy_primitives::{Address, Bytes, U256};
+use alloy_sol_types::sol;
 use uniswap_sdk_core::prelude::*;
 use uniswap_v3_sdk::prelude::*;
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub struct PathKey<I: TickIndex> {
-    intermediate_currency: Address,
-    fee: U24,
-    tick_spacing: I,
-    hooks: Address,
-    hook_data: Bytes,
+sol! {
+    #[derive(Debug, PartialEq)]
+    struct PathKey {
+        address intermediateCurrency;
+        uint256 fee;
+        int24 tickSpacing;
+        address hooks;
+        bytes hookData;
+    }
 }
 
 #[inline]
 pub fn encode_route_to_path<TInput, TOutput, TP>(
     route: &Route<TInput, TOutput, TP>,
     exact_output: bool,
-) -> Vec<PathKey<TP::Index>>
+) -> Vec<PathKey>
 where
     TInput: BaseCurrency,
     TOutput: BaseCurrency,
     TP: TickDataProvider,
 {
-    let mut path_keys: Vec<PathKey<_>> = Vec::with_capacity(route.pools.len());
+    let mut path_keys: Vec<PathKey> = Vec::with_capacity(route.pools.len());
     if exact_output {
         let mut output_currency = &route.path_output;
         for pool in route.pools.iter().rev() {
@@ -46,7 +49,7 @@ where
 fn get_next_path_key<'a, TInput, TP>(
     pool: &'a Pool<TP>,
     input_currency: &'a TInput,
-) -> (&'a Currency, PathKey<TP::Index>)
+) -> (&'a Currency, PathKey)
 where
     TInput: BaseCurrency,
     TP: TickDataProvider,
@@ -59,15 +62,15 @@ where
     (
         next_currency,
         PathKey {
-            intermediate_currency: if next_currency.is_native() {
+            intermediateCurrency: if next_currency.is_native() {
                 Address::ZERO
             } else {
                 next_currency.address()
             },
-            fee: pool.fee,
-            tick_spacing: pool.tick_spacing,
+            fee: U256::from(pool.fee),
+            tickSpacing: pool.tick_spacing.to_i24(),
             hooks: pool.hooks,
-            hook_data: Bytes::default(),
+            hookData: Bytes::default(),
         },
     )
 }
