@@ -191,6 +191,7 @@ where
                     pool.tick_spacing,
                     pool.hooks,
                 )
+                .unwrap()
             });
         let pool_id_set = FxHashSet::from_iter(pool_ids);
         assert_eq!(num_pools, pool_id_set.len(), "POOLS_DUPLICATED");
