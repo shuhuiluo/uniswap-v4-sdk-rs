@@ -184,7 +184,7 @@ sol! {
     }
 
     #[derive(Debug, PartialEq)]
-    struct FinalizeParams {
+    struct ActionsParams {
         bytes actions;
         bytes[] params;
     }
@@ -295,7 +295,7 @@ impl V4Planner {
     #[inline]
     #[must_use]
     pub fn finalize(self) -> Bytes {
-        FinalizeParams {
+        ActionsParams {
             actions: self.actions.into(),
             params: self.params,
         }
