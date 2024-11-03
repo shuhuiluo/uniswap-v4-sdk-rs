@@ -1,19 +1,7 @@
-use crate::prelude::{Pool, Route};
+use crate::prelude::{PathKey, Pool, Route};
 use alloy_primitives::{Address, Bytes, U256};
-use alloy_sol_types::sol;
 use uniswap_sdk_core::prelude::*;
 use uniswap_v3_sdk::prelude::*;
-
-sol! {
-    #[derive(Debug, PartialEq)]
-    struct PathKey {
-        address intermediateCurrency;
-        uint256 fee;
-        int24 tickSpacing;
-        address hooks;
-        bytes hookData;
-    }
-}
 
 #[inline]
 pub fn encode_route_to_path<TInput, TOutput, TP>(

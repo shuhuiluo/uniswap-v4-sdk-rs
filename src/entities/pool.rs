@@ -1,19 +1,13 @@
 use crate::prelude::{Error, *};
-use alloy_primitives::{aliases::U24, keccak256, uint, Address, ChainId, B256, I256, U160};
+use alloy_primitives::{
+    aliases::{I24, U24},
+    keccak256, uint, Address, ChainId, B256, I256, U160,
+};
 use alloy_sol_types::SolValue;
 use uniswap_sdk_core::prelude::*;
 use uniswap_v3_sdk::prelude::*;
 
 pub const DYANMIC_FEE_FLAG: U24 = uint!(0x800000_U24);
-
-#[derive(Clone, Debug)]
-pub struct PoolKey<I: TickIndex> {
-    currency0: Address,
-    currency1: Address,
-    fee: U24,
-    tick_spacing: I,
-    hooks: Address,
-}
 
 /// Represents a V4 pool
 #[derive(Clone, Debug)]
@@ -30,7 +24,7 @@ where
     pub liquidity: u128,
     pub tick_current: TP::Index,
     pub tick_data_provider: TP,
-    pub pool_key: PoolKey<TP::Index>,
+    pub pool_key: PoolKey,
     pub pool_id: B256,
 }
 
@@ -68,19 +62,19 @@ impl Pool {
     }
 
     #[inline]
-    pub fn get_pool_key<I: TickIndex>(
+    pub fn get_pool_key(
         currency_a: &Currency,
         currency_b: &Currency,
         fee: U24,
-        tick_spacing: I,
+        tick_spacing: I24,
         hooks: Address,
-    ) -> Result<PoolKey<I>, Error> {
+    ) -> Result<PoolKey, Error> {
         let (currency0_addr, currency1_addr) = Self::sort_currency(currency_a, currency_b)?;
         Ok(PoolKey {
             currency0: currency0_addr,
             currency1: currency1_addr,
             fee,
-            tick_spacing,
+            tickSpacing: tick_spacing,
             hooks,
         })
     }
@@ -171,7 +165,8 @@ impl<TP: TickDataProvider> Pool<TP> {
         if fee == DYANMIC_FEE_FLAG {
             assert_ne!(hooks, Address::ZERO, "Dynamic fee pool requires a hook");
         }
-        let pool_key = Pool::get_pool_key(&currency_a, &currency_b, fee, tick_spacing, hooks)?;
+        let pool_key =
+            Pool::get_pool_key(&currency_a, &currency_b, fee, tick_spacing.to_i24(), hooks)?;
         let pool_id = Pool::get_pool_id(&currency_a, &currency_b, fee, tick_spacing, hooks)?;
         let tick_current = sqrt_ratio_x96
             .get_tick_at_sqrt_ratio()?

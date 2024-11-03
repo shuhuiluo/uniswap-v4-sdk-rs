@@ -27,6 +27,7 @@
 
 extern crate alloc;
 
+pub mod abi;
 pub mod entities;
 pub mod error;
 pub mod utils;
@@ -34,5 +35,5 @@ pub mod utils;
 pub use uniswap_v3_sdk::multicall;
 
 pub mod prelude {
-    pub use crate::{entities::*, error::*, multicall::*, utils::*};
+    pub use crate::{abi::*, entities::*, error::*, multicall::*, utils::*};
 }
