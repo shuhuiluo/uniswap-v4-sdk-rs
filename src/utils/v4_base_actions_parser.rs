@@ -1,4 +1,5 @@
 use crate::prelude::{Actions, ActionsParams, Error};
+use alloc::vec::Vec;
 use alloy_primitives::Bytes;
 use alloy_sol_types::SolType;
 use core::iter::zip;
