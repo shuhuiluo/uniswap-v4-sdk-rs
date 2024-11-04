@@ -110,9 +110,8 @@ pub struct V4Planner {
 impl V4Planner {
     #[inline]
     pub fn add_action(&mut self, action: &Actions) {
-        let action = create_action(action);
-        self.actions.push(action.action);
-        self.params.push(action.encoded_input);
+        self.actions.push(action.command());
+        self.params.push(action.abi_encode());
     }
 
     #[inline]
@@ -222,18 +221,6 @@ fn currency_address(currency: &impl BaseCurrency) -> Address {
         Address::ZERO
     } else {
         currency.wrapped().address()
-    }
-}
-
-struct RouterAction {
-    action: u8,
-    encoded_input: Bytes,
-}
-
-fn create_action(action: &Actions) -> RouterAction {
-    RouterAction {
-        action: action.command(),
-        encoded_input: action.abi_encode(),
     }
 }
 
