@@ -34,6 +34,9 @@ pub mod utils;
 
 pub use uniswap_v3_sdk::multicall;
 
+#[cfg(test)]
+mod tests;
+
 pub mod prelude {
     pub use crate::{abi::*, entities::*, error::*, multicall::*, utils::*};
 }

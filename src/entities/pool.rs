@@ -1,8 +1,5 @@
 use crate::prelude::{Error, *};
-use alloy_primitives::{
-    aliases::{I24, U24},
-    keccak256, uint, Address, ChainId, B256, I256, U160,
-};
+use alloy_primitives::{aliases::U24, keccak256, uint, Address, ChainId, B256, I256, U160};
 use alloy_sol_types::SolValue;
 use uniswap_sdk_core::prelude::*;
 use uniswap_v3_sdk::prelude::*;
@@ -62,11 +59,11 @@ impl Pool {
     }
 
     #[inline]
-    pub fn get_pool_key(
+    pub fn get_pool_key<I: TickIndex>(
         currency_a: &Currency,
         currency_b: &Currency,
         fee: U24,
-        tick_spacing: I24,
+        tick_spacing: I,
         hooks: Address,
     ) -> Result<PoolKey, Error> {
         let (currency0_addr, currency1_addr) = Self::sort_currency(currency_a, currency_b)?;
@@ -74,7 +71,7 @@ impl Pool {
             currency0: currency0_addr,
             currency1: currency1_addr,
             fee,
-            tickSpacing: tick_spacing,
+            tickSpacing: tick_spacing.to_i24(),
             hooks,
         })
     }
@@ -440,5 +437,402 @@ impl<TP: Clone + TickDataProvider> Pool<TP> {
                 self.tick_data_provider.clone(),
             )?,
         ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tests::*;
+    use alloy_primitives::b256;
+
+    mod constructor {
+        use super::*;
+
+        #[test]
+        #[should_panic(expected = "Core(ChainIdMismatch(1, 3))")]
+        fn cannot_be_used_for_currencies_on_different_chains() {
+            Pool::new(
+                Currency::Token(USDC.clone()),
+                Currency::Token(WETH9::on_chain(3).unwrap()),
+                FeeAmount::MEDIUM.into(),
+                10,
+                Address::ZERO,
+                encode_sqrt_ratio_x96(1, 1),
+                0,
+            )
+            .unwrap();
+        }
+
+        #[test]
+        #[should_panic(expected = "FEE")]
+        fn fee_cannot_be_more_than_1e6() {
+            Pool::new(
+                Currency::Token(USDC.clone()),
+                Currency::Token(WETH.clone()),
+                uint!(1_000_000_U24),
+                10,
+                Address::ZERO,
+                encode_sqrt_ratio_x96(1, 1),
+                0,
+            )
+            .unwrap();
+        }
+
+        #[test]
+        fn fee_can_be_dynamic() {
+            let pool = Pool::new(
+                Currency::Token(USDC.clone()),
+                Currency::Token(WETH.clone()),
+                DYANMIC_FEE_FLAG,
+                10,
+                address!("fff0000000000000000000000000000000000000"),
+                encode_sqrt_ratio_x96(1, 1),
+                0,
+            )
+            .unwrap();
+            assert_eq!(pool.fee, DYANMIC_FEE_FLAG);
+        }
+
+        #[test]
+        #[should_panic(expected = "Dynamic fee pool requires a hook")]
+        fn dynamic_fee_pool_requires_hook() {
+            Pool::new(
+                Currency::Token(USDC.clone()),
+                Currency::Token(WETH.clone()),
+                DYANMIC_FEE_FLAG,
+                10,
+                Address::ZERO,
+                encode_sqrt_ratio_x96(1, 1),
+                0,
+            )
+            .unwrap();
+        }
+
+        #[test]
+        #[should_panic(expected = "Core(EqualAddresses)")]
+        fn cannot_be_given_two_of_the_same_currency() {
+            Pool::new(
+                Currency::Token(USDC.clone()),
+                Currency::Token(USDC.clone()),
+                FeeAmount::MEDIUM.into(),
+                10,
+                Address::ZERO,
+                encode_sqrt_ratio_x96(1, 1),
+                0,
+            )
+            .unwrap();
+        }
+
+        #[test]
+        fn works_with_valid_arguments_for_empty_pool_medium_fee() {
+            Pool::new(
+                Currency::Token(USDC.clone()),
+                Currency::Token(WETH.clone()),
+                FeeAmount::MEDIUM.into(),
+                10,
+                Address::ZERO,
+                encode_sqrt_ratio_x96(1, 1),
+                0,
+            )
+            .unwrap();
+        }
+
+        #[test]
+        fn works_with_valid_arguments_for_empty_pool_lowest_fee() {
+            Pool::new(
+                Currency::Token(USDC.clone()),
+                Currency::Token(WETH.clone()),
+                FeeAmount::LOWEST.into(),
+                10,
+                Address::ZERO,
+                encode_sqrt_ratio_x96(1, 1),
+                0,
+            )
+            .unwrap();
+        }
+
+        #[test]
+        fn works_with_valid_arguments_for_empty_pool_highest_fee() {
+            Pool::new(
+                Currency::Token(USDC.clone()),
+                Currency::Token(WETH.clone()),
+                FeeAmount::HIGH.into(),
+                10,
+                Address::ZERO,
+                encode_sqrt_ratio_x96(1, 1),
+                0,
+            )
+            .unwrap();
+        }
+    }
+
+    #[test]
+    fn get_pool_id_returns_correct_pool_id() {
+        let result1 = Pool::get_pool_id(
+            &Currency::Token(USDC.clone()),
+            &Currency::Token(DAI.clone()),
+            FeeAmount::LOWEST.into(),
+            10,
+            Address::ZERO,
+        )
+        .unwrap();
+        assert_eq!(
+            result1,
+            b256!("503fb8d73fd2351c645ae9fea85381bac6b16ea0c2038e14dc1e96d447c8ffbb")
+        );
+
+        let result2 = Pool::get_pool_id(
+            &Currency::Token(DAI.clone()),
+            &Currency::Token(USDC.clone()),
+            FeeAmount::LOWEST.into(),
+            10,
+            Address::ZERO,
+        )
+        .unwrap();
+        assert_eq!(result2, result1);
+    }
+
+    #[test]
+    fn get_pool_key_returns_correct_pool_key() {
+        let result1 = Pool::get_pool_key(
+            &Currency::Token(USDC.clone()),
+            &Currency::Token(DAI.clone()),
+            FeeAmount::LOWEST.into(),
+            10,
+            Address::ZERO,
+        )
+        .unwrap();
+        assert_eq!(
+            result1,
+            PoolKey {
+                currency0: DAI.address(),
+                currency1: USDC.address(),
+                fee: FeeAmount::LOWEST.into(),
+                tickSpacing: 10.to_i24(),
+                hooks: Address::ZERO
+            }
+        );
+
+        let result2 = Pool::get_pool_key(
+            &Currency::Token(DAI.clone()),
+            &Currency::Token(USDC.clone()),
+            FeeAmount::LOWEST.into(),
+            10,
+            Address::ZERO,
+        )
+        .unwrap();
+        assert_eq!(result2, result1);
+    }
+
+    #[test]
+    fn currency0_always_is_the_currency_that_sorts_before() {
+        assert_eq!(USDC_DAI.currency0, Currency::Token(DAI.clone()));
+        assert_eq!(DAI_USDC.currency0, Currency::Token(DAI.clone()));
+    }
+
+    #[test]
+    fn currency1_always_is_the_currency_that_sorts_after() {
+        assert_eq!(USDC_DAI.currency1, Currency::Token(USDC.clone()));
+        assert_eq!(DAI_USDC.currency1, Currency::Token(USDC.clone()));
+    }
+
+    #[test]
+    fn pool_id_is_correct() {
+        assert_eq!(
+            USDC_DAI.pool_id,
+            b256!("503fb8d73fd2351c645ae9fea85381bac6b16ea0c2038e14dc1e96d447c8ffbb")
+        );
+    }
+
+    #[test]
+    fn pool_key_is_correct() {
+        assert_eq!(
+            USDC_DAI.pool_key,
+            PoolKey {
+                currency0: DAI.address(),
+                currency1: USDC.address(),
+                fee: FeeAmount::LOWEST.into(),
+                tickSpacing: 10.to_i24(),
+                hooks: Address::ZERO
+            }
+        );
+    }
+
+    #[test]
+    fn currency0_price_returns_price_of_currency0_in_terms_of_currency1() {
+        assert_eq!(
+            Pool::new(
+                Currency::Token(USDC.clone()),
+                Currency::Token(DAI.clone()),
+                FeeAmount::LOWEST.into(),
+                10,
+                Address::ZERO,
+                encode_sqrt_ratio_x96(BigInt::from(101e6 as u128), BigInt::from(100e18 as u128)),
+                0,
+            )
+            .unwrap()
+            .currency0_price()
+            .to_significant(5, Rounding::RoundHalfUp)
+            .unwrap(),
+            "1.01"
+        );
+        assert_eq!(
+            Pool::new(
+                Currency::Token(DAI.clone()),
+                Currency::Token(USDC.clone()),
+                FeeAmount::LOWEST.into(),
+                10,
+                Address::ZERO,
+                encode_sqrt_ratio_x96(BigInt::from(101e6 as u128), BigInt::from(100e18 as u128)),
+                0,
+            )
+            .unwrap()
+            .currency0_price()
+            .to_significant(5, Rounding::RoundHalfUp)
+            .unwrap(),
+            "1.01"
+        );
+    }
+
+    #[test]
+    fn currency1_price_returns_price_of_currency1_in_terms_of_currency0() {
+        assert_eq!(
+            Pool::new(
+                Currency::Token(USDC.clone()),
+                Currency::Token(DAI.clone()),
+                FeeAmount::LOWEST.into(),
+                10,
+                Address::ZERO,
+                encode_sqrt_ratio_x96(BigInt::from(101e6 as u128), BigInt::from(100e18 as u128)),
+                0,
+            )
+            .unwrap()
+            .currency1_price()
+            .to_significant(5, Rounding::RoundHalfUp)
+            .unwrap(),
+            "0.9901"
+        );
+        assert_eq!(
+            Pool::new(
+                Currency::Token(DAI.clone()),
+                Currency::Token(USDC.clone()),
+                FeeAmount::LOWEST.into(),
+                10,
+                Address::ZERO,
+                encode_sqrt_ratio_x96(BigInt::from(101e6 as u128), BigInt::from(100e18 as u128)),
+                0,
+            )
+            .unwrap()
+            .currency1_price()
+            .to_significant(5, Rounding::RoundHalfUp)
+            .unwrap(),
+            "0.9901"
+        );
+    }
+
+    mod price_of {
+        use super::*;
+
+        #[test]
+        fn returns_price_of_currency_in_terms_of_other_currency() {
+            assert_eq!(
+                USDC_DAI.price_of(&DAI.clone()).unwrap(),
+                USDC_DAI.currency0_price()
+            );
+            assert_eq!(
+                USDC_DAI.price_of(&USDC.clone()).unwrap(),
+                USDC_DAI.currency1_price()
+            );
+        }
+
+        #[test]
+        #[should_panic(expected = "InvalidCurrency")]
+        fn throws_if_invalid_currency() {
+            USDC_DAI.price_of(&WETH.clone()).unwrap();
+        }
+    }
+
+    #[test]
+    fn chain_id_returns_chain_id_of_currencies() {
+        assert_eq!(USDC_DAI.chain_id(), 1);
+        assert_eq!(DAI_USDC.chain_id(), 1);
+    }
+
+    #[test]
+    fn involves_currency_returns_true_if_currency_is_in_pool() {
+        assert!(USDC_DAI.involves_currency(&USDC.clone()));
+        assert!(USDC_DAI.involves_currency(&DAI.clone()));
+        assert!(!USDC_DAI.involves_currency(&WETH9::on_chain(1).unwrap()));
+    }
+
+    mod swaps {
+        use super::*;
+        use once_cell::sync::Lazy;
+
+        static POOL: Lazy<Pool<Vec<Tick>>> = Lazy::new(|| {
+            Pool::new_with_tick_data_provider(
+                Currency::Token(USDC.clone()),
+                Currency::Token(DAI.clone()),
+                FeeAmount::LOWEST.into(),
+                10,
+                Address::ZERO,
+                encode_sqrt_ratio_x96(1, 1),
+                ONE_ETHER,
+                vec![
+                    Tick {
+                        index: nearest_usable_tick(MIN_TICK_I32, 10),
+                        liquidity_net: ONE_ETHER as i128,
+                        liquidity_gross: ONE_ETHER,
+                    },
+                    Tick {
+                        index: nearest_usable_tick(MAX_TICK_I32, 10),
+                        liquidity_net: -(ONE_ETHER as i128),
+                        liquidity_gross: ONE_ETHER,
+                    },
+                ],
+            )
+            .unwrap()
+        });
+
+        mod get_output_amount {
+            use super::*;
+
+            #[test]
+            fn usdc_to_dai() {
+                let input_amount = CurrencyAmount::from_raw_amount(USDC.clone(), 100).unwrap();
+                let (output_amount, _) = POOL.get_output_amount(&input_amount, None).unwrap();
+                assert!(output_amount.currency.equals(&DAI.clone()));
+                assert_eq!(output_amount.quotient(), 98.into());
+            }
+
+            #[test]
+            fn dai_to_usdc() {
+                let input_amount = CurrencyAmount::from_raw_amount(DAI.clone(), 100).unwrap();
+                let (output_amount, _) = POOL.get_output_amount(&input_amount, None).unwrap();
+                assert!(output_amount.currency.equals(&USDC.clone()));
+                assert_eq!(output_amount.quotient(), 98.into());
+            }
+        }
+
+        mod get_input_amount {
+            use super::*;
+
+            #[test]
+            fn usdc_to_dai() {
+                let output_amount = CurrencyAmount::from_raw_amount(DAI.clone(), 98).unwrap();
+                let (input_amount, _) = POOL.get_input_amount(&output_amount, None).unwrap();
+                assert!(input_amount.currency.equals(&USDC.clone()));
+                assert_eq!(input_amount.quotient(), 100.into());
+            }
+
+            #[test]
+            fn dai_to_usdc() {
+                let output_amount = CurrencyAmount::from_raw_amount(USDC.clone(), 98).unwrap();
+                let (input_amount, _) = POOL.get_input_amount(&output_amount, None).unwrap();
+                assert!(input_amount.currency.equals(&DAI.clone()));
+                assert_eq!(input_amount.quotient(), 100.into());
+            }
+        }
     }
 }
