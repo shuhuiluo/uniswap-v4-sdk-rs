@@ -107,7 +107,7 @@ pub struct V4Planner {
     pub params: Vec<Bytes>,
 }
 
-impl V4Planner {
+ impl V4Planner {
     #[inline]
     pub fn add_action(&mut self, action: &Actions) {
         self.actions.push(action.command());

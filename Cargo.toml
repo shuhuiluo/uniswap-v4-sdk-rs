@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+alloy = "0.5.4"
 alloy-primitives = "0.8"
 alloy-sol-types = "0.8"
 derive_more = "1.0.0"
