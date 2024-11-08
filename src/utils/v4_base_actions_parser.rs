@@ -10,6 +10,7 @@ pub struct V4RouterCall {
 }
 
 #[inline]
+
 pub fn parse_calldata(calldata: &Bytes) -> Result<V4RouterCall, Error> {
     let ActionsParams { actions, params } =
         ActionsParams::abi_decode(calldata.iter().as_slice(), true)?;

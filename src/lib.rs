@@ -31,6 +31,7 @@ pub mod abi;
 pub mod entities;
 pub mod error;
 pub mod utils;
+pub mod position_manager;
 
 pub use uniswap_v3_sdk::multicall;
 
