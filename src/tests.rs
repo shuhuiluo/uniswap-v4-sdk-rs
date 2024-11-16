@@ -23,6 +23,42 @@ pub(crate) static DAI: Lazy<Token> = Lazy::new(|| {
         "DAI Stablecoin"
     )
 });
+pub(crate) static TOKEN0: Lazy<Token> = Lazy::new(|| {
+    token!(
+        1,
+        "0000000000000000000000000000000000000001",
+        18,
+        "t0",
+        "token0"
+    )
+});
+pub(crate) static TOKEN1: Lazy<Token> = Lazy::new(|| {
+    token!(
+        1,
+        "0000000000000000000000000000000000000002",
+        18,
+        "t1",
+        "token1"
+    )
+});
+pub(crate) static TOKEN2: Lazy<Token> = Lazy::new(|| {
+    token!(
+        1,
+        "0000000000000000000000000000000000000003",
+        18,
+        "t2",
+        "token2"
+    )
+});
+pub(crate) static TOKEN3: Lazy<Token> = Lazy::new(|| {
+    token!(
+        1,
+        "0000000000000000000000000000000000000004",
+        18,
+        "t3",
+        "token3"
+    )
+});
 
 pub(crate) static USDC_DAI: Lazy<Pool> = Lazy::new(|| {
     Pool::new(

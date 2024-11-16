@@ -1,4 +1,4 @@
-use crate::prelude::{Error, Pool, Route};
+use crate::prelude::{amount_with_path_currency, Error, Pool, Route};
 use rustc_hash::FxHashSet;
 use uniswap_sdk_core::prelude::{sorted_insert::sorted_insert, *};
 use uniswap_v3_sdk::prelude::*;
@@ -563,8 +563,9 @@ where
         match trade_type {
             TradeType::ExactInput => {
                 assert!(amount.currency.equals(&route.input), "INPUT");
-                let (mut token_amount, _) = route.pools[0].get_output_amount(&amount, None)?;
-                for pool in &route.pools[1..] {
+                // Account for trades that wrap/unwrap as a first step
+                let mut token_amount = amount_with_path_currency(&amount, &route.pools[0])?;
+                for pool in &route.pools {
                     (token_amount, _) = pool.get_output_amount(&token_amount, None)?;
                 }
                 output_amount = CurrencyAmount::from_fractional_amount(
@@ -580,12 +581,10 @@ where
             }
             TradeType::ExactOutput => {
                 assert!(amount.currency.equals(&route.output), "OUTPUT");
-                let (mut token_amount, _) = route
-                    .pools
-                    .last()
-                    .unwrap()
-                    .get_input_amount(&amount, None)?;
-                for pool in route.pools.iter().rev().skip(1) {
+                // Account for trades that wrap/unwrap as a last step
+                let mut token_amount =
+                    amount_with_path_currency(&amount, &route.pools.last().unwrap())?;
+                for pool in route.pools.iter().rev() {
                     (token_amount, _) = pool.get_input_amount(&token_amount, None)?;
                 }
                 input_amount = CurrencyAmount::from_fractional_amount(
@@ -830,5 +829,339 @@ where
             }
         }
         Ok(best_trades)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tests::*;
+    use once_cell::sync::Lazy;
+
+    fn v2_style_pool(
+        reserve0: CurrencyAmount<Currency>,
+        reserve1: CurrencyAmount<Currency>,
+        fee_amount: Option<FeeAmount>,
+    ) -> Pool<TickListDataProvider> {
+        let fee_amount = fee_amount.unwrap_or(FeeAmount::MEDIUM);
+        let sqrt_ratio_x96 = encode_sqrt_ratio_x96(reserve1.quotient(), reserve0.quotient());
+        let liquidity = (reserve0.quotient() * reserve1.quotient())
+            .sqrt()
+            .to_u128()
+            .unwrap();
+        let tick_spacing = 60;
+        Pool::new_with_tick_data_provider(
+            reserve0.meta.currency,
+            reserve1.meta.currency,
+            fee_amount.into(),
+            tick_spacing,
+            Address::ZERO,
+            sqrt_ratio_x96,
+            liquidity,
+            TickListDataProvider::new(
+                vec![
+                    Tick::new(
+                        nearest_usable_tick(MIN_TICK_I32, tick_spacing),
+                        liquidity,
+                        liquidity as i128,
+                    ),
+                    Tick::new(
+                        nearest_usable_tick(MAX_TICK_I32, tick_spacing),
+                        liquidity,
+                        -(liquidity as i128),
+                    ),
+                ],
+                tick_spacing,
+            ),
+        )
+        .unwrap()
+    }
+
+    static POOL_0_1: Lazy<Pool<TickListDataProvider>> = Lazy::new(|| {
+        v2_style_pool(
+            CurrencyAmount::from_raw_amount(TOKEN0.clone().into(), 100000).unwrap(),
+            CurrencyAmount::from_raw_amount(TOKEN1.clone().into(), 100000).unwrap(),
+            None,
+        )
+    });
+    static POOL_0_2: Lazy<Pool<TickListDataProvider>> = Lazy::new(|| {
+        v2_style_pool(
+            CurrencyAmount::from_raw_amount(TOKEN0.clone().into(), 100000).unwrap(),
+            CurrencyAmount::from_raw_amount(TOKEN2.clone().into(), 110000).unwrap(),
+            None,
+        )
+    });
+    static POOL_0_3: Lazy<Pool<TickListDataProvider>> = Lazy::new(|| {
+        v2_style_pool(
+            CurrencyAmount::from_raw_amount(TOKEN0.clone().into(), 100000).unwrap(),
+            CurrencyAmount::from_raw_amount(TOKEN3.clone().into(), 90000).unwrap(),
+            None,
+        )
+    });
+    static POOL_1_2: Lazy<Pool<TickListDataProvider>> = Lazy::new(|| {
+        v2_style_pool(
+            CurrencyAmount::from_raw_amount(TOKEN1.clone().into(), 120000).unwrap(),
+            CurrencyAmount::from_raw_amount(TOKEN2.clone().into(), 100000).unwrap(),
+            None,
+        )
+    });
+    static POOL_1_3: Lazy<Pool<TickListDataProvider>> = Lazy::new(|| {
+        v2_style_pool(
+            CurrencyAmount::from_raw_amount(TOKEN1.clone().into(), 120000).unwrap(),
+            CurrencyAmount::from_raw_amount(TOKEN3.clone().into(), 130000).unwrap(),
+            None,
+        )
+    });
+    static POOL_ETH_0: Lazy<Pool<TickListDataProvider>> = Lazy::new(|| {
+        v2_style_pool(
+            CurrencyAmount::from_raw_amount(ETHER.clone().into(), 100000).unwrap(),
+            CurrencyAmount::from_raw_amount(TOKEN0.clone().into(), 100000).unwrap(),
+            None,
+        )
+    });
+    static POOL_ETH_1: Lazy<Pool<TickListDataProvider>> = Lazy::new(|| {
+        v2_style_pool(
+            CurrencyAmount::from_raw_amount(ETHER.clone().into(), 100000).unwrap(),
+            CurrencyAmount::from_raw_amount(TOKEN1.clone().into(), 100000).unwrap(),
+            None,
+        )
+    });
+    static POOL_ETH_2: Lazy<Pool<TickListDataProvider>> = Lazy::new(|| {
+        v2_style_pool(
+            CurrencyAmount::from_raw_amount(ETHER.clone().into(), 100000).unwrap(),
+            CurrencyAmount::from_raw_amount(TOKEN2.clone().into(), 100000).unwrap(),
+            None,
+        )
+    });
+    static POOL_WETH_0: Lazy<Pool<TickListDataProvider>> = Lazy::new(|| {
+        v2_style_pool(
+            CurrencyAmount::from_raw_amount(WETH.clone().into(), 100000).unwrap(),
+            CurrencyAmount::from_raw_amount(TOKEN0.clone().into(), 100000).unwrap(),
+            None,
+        )
+    });
+
+    mod from_route {
+        use super::*;
+
+        #[test]
+        fn can_be_constructed_with_ether_as_input() {
+            let trade = Trade::from_route(
+                Route::new(vec![POOL_ETH_0.clone()], ETHER.clone(), TOKEN0.clone()).unwrap(),
+                CurrencyAmount::from_raw_amount(ETHER.clone(), 10000).unwrap(),
+                TradeType::ExactInput,
+            )
+            .unwrap();
+            assert_eq!(trade.input_currency().clone(), ETHER.clone());
+            assert_eq!(trade.output_currency().clone(), TOKEN0.clone());
+        }
+
+        #[test]
+        fn can_be_constructed_with_ether_as_input_on_a_weth_pool() {
+            let trade = Trade::from_route(
+                Route::new(vec![POOL_WETH_0.clone()], ETHER.clone(), TOKEN0.clone()).unwrap(),
+                CurrencyAmount::from_raw_amount(ETHER.clone(), 10000).unwrap(),
+                TradeType::ExactInput,
+            )
+            .unwrap();
+            assert_eq!(trade.input_currency().clone(), ETHER.clone());
+            assert_eq!(trade.output_currency().clone(), TOKEN0.clone());
+        }
+
+        #[test]
+        fn can_be_constructed_with_weth_as_input_on_a_eth_pool() {
+            let trade = Trade::from_route(
+                Route::new(vec![POOL_ETH_0.clone()], WETH.clone(), TOKEN0.clone()).unwrap(),
+                CurrencyAmount::from_raw_amount(WETH.clone(), 10000).unwrap(),
+                TradeType::ExactInput,
+            )
+            .unwrap();
+            assert_eq!(trade.input_currency().clone(), WETH.clone());
+            assert_eq!(trade.output_currency().clone(), TOKEN0.clone());
+        }
+
+        #[test]
+        fn can_be_constructed_with_ether_as_output_on_a_weth_pool() {
+            let trade = Trade::from_route(
+                Route::new(vec![POOL_WETH_0.clone()], TOKEN0.clone(), ETHER.clone()).unwrap(),
+                CurrencyAmount::from_raw_amount(TOKEN0.clone(), 10000).unwrap(),
+                TradeType::ExactInput,
+            )
+            .unwrap();
+            assert_eq!(trade.input_currency().clone(), TOKEN0.clone());
+            assert_eq!(trade.output_currency().clone(), ETHER.clone());
+        }
+
+        #[test]
+        fn can_be_constructed_with_weth_as_output_on_a_eth_pool() {
+            let trade = Trade::from_route(
+                Route::new(vec![POOL_ETH_0.clone()], TOKEN0.clone(), WETH.clone()).unwrap(),
+                CurrencyAmount::from_raw_amount(TOKEN0.clone(), 10000).unwrap(),
+                TradeType::ExactInput,
+            )
+            .unwrap();
+            assert_eq!(trade.input_currency().clone(), TOKEN0.clone());
+            assert_eq!(trade.output_currency().clone(), WETH.clone());
+        }
+
+        #[test]
+        fn can_be_constructed_with_ether_as_input_for_exact_output() {
+            let trade = Trade::from_route(
+                Route::new(vec![POOL_ETH_0.clone()], ETHER.clone(), TOKEN0.clone()).unwrap(),
+                CurrencyAmount::from_raw_amount(TOKEN0.clone(), 10000).unwrap(),
+                TradeType::ExactOutput,
+            )
+            .unwrap();
+            assert_eq!(trade.input_currency().clone(), ETHER.clone());
+            assert_eq!(trade.output_currency().clone(), TOKEN0.clone());
+        }
+
+        #[test]
+        fn can_be_constructed_with_ether_as_output() {
+            let trade = Trade::from_route(
+                Route::new(vec![POOL_ETH_0.clone()], TOKEN0.clone(), ETHER.clone()).unwrap(),
+                CurrencyAmount::from_raw_amount(ETHER.clone(), 10000).unwrap(),
+                TradeType::ExactOutput,
+            )
+            .unwrap();
+            assert_eq!(trade.input_currency().clone(), TOKEN0.clone());
+            assert_eq!(trade.output_currency().clone(), ETHER.clone());
+        }
+
+        #[test]
+        fn can_be_constructed_with_ether_as_output_for_exact_input() {
+            let trade = Trade::from_route(
+                Route::new(vec![POOL_ETH_0.clone()], TOKEN0.clone(), ETHER.clone()).unwrap(),
+                CurrencyAmount::from_raw_amount(TOKEN0.clone(), 10000).unwrap(),
+                TradeType::ExactInput,
+            )
+            .unwrap();
+            assert_eq!(trade.input_currency().clone(), TOKEN0.clone());
+            assert_eq!(trade.output_currency().clone(), ETHER.clone());
+        }
+    }
+
+    mod from_routes {
+        use super::*;
+
+        #[test]
+        fn can_be_constructed_with_ether_as_input_with_multiple_routes() {
+            let trade = Trade::from_routes(
+                vec![(
+                    CurrencyAmount::from_raw_amount(ETHER.clone(), 10000).unwrap(),
+                    Route::new(vec![POOL_ETH_0.clone()], ETHER.clone(), TOKEN0.clone()).unwrap(),
+                )],
+                TradeType::ExactInput,
+            )
+            .unwrap();
+            assert_eq!(trade.input_currency().clone(), ETHER.clone());
+            assert_eq!(trade.output_currency().clone(), TOKEN0.clone());
+        }
+
+        #[test]
+        fn can_be_constructed_with_ether_as_input_for_exact_output_with_multiple_routes() {
+            let trade = Trade::from_routes(
+                vec![
+                    (
+                        CurrencyAmount::from_raw_amount(TOKEN0.clone(), 3000).unwrap(),
+                        Route::new(vec![POOL_ETH_0.clone()], ETHER.clone(), TOKEN0.clone())
+                            .unwrap(),
+                    ),
+                    (
+                        CurrencyAmount::from_raw_amount(TOKEN0.clone(), 7000).unwrap(),
+                        Route::new(
+                            vec![POOL_ETH_1.clone(), POOL_0_1.clone()],
+                            ETHER.clone(),
+                            TOKEN0.clone(),
+                        )
+                        .unwrap(),
+                    ),
+                ],
+                TradeType::ExactOutput,
+            )
+            .unwrap();
+            assert_eq!(trade.input_currency().clone(), ETHER.clone());
+            assert_eq!(trade.output_currency().clone(), TOKEN0.clone());
+        }
+
+        #[test]
+        fn can_be_constructed_with_ether_as_output_with_multiple_routes() {
+            let trade = Trade::from_routes(
+                vec![
+                    (
+                        CurrencyAmount::from_raw_amount(ETHER.clone(), 4000).unwrap(),
+                        Route::new(vec![POOL_ETH_0.clone()], TOKEN0.clone(), ETHER.clone())
+                            .unwrap(),
+                    ),
+                    (
+                        CurrencyAmount::from_raw_amount(ETHER.clone(), 6000).unwrap(),
+                        Route::new(
+                            vec![POOL_0_1.clone(), POOL_ETH_1.clone()],
+                            TOKEN0.clone(),
+                            ETHER.clone(),
+                        )
+                        .unwrap(),
+                    ),
+                ],
+                TradeType::ExactOutput,
+            )
+            .unwrap();
+            assert_eq!(trade.input_currency().clone(), TOKEN0.clone());
+            assert_eq!(trade.output_currency().clone(), ETHER.clone());
+        }
+
+        #[test]
+        fn can_be_constructed_with_ether_as_output_for_exact_input_with_multiple_routes() {
+            let trade = Trade::from_routes(
+                vec![
+                    (
+                        CurrencyAmount::from_raw_amount(TOKEN0.clone(), 3000).unwrap(),
+                        Route::new(vec![POOL_ETH_0.clone()], TOKEN0.clone(), ETHER.clone())
+                            .unwrap(),
+                    ),
+                    (
+                        CurrencyAmount::from_raw_amount(TOKEN0.clone(), 7000).unwrap(),
+                        Route::new(
+                            vec![POOL_0_1.clone(), POOL_ETH_1.clone()],
+                            TOKEN0.clone(),
+                            ETHER.clone(),
+                        )
+                        .unwrap(),
+                    ),
+                ],
+                TradeType::ExactInput,
+            )
+            .unwrap();
+            assert_eq!(trade.input_currency().clone(), TOKEN0.clone());
+            assert_eq!(trade.output_currency().clone(), ETHER.clone());
+        }
+
+        #[test]
+        #[should_panic(expected = "POOLS_DUPLICATED")]
+        fn throws_if_pools_are_reused_between_routes() {
+            let _ = Trade::from_routes(
+                vec![
+                    (
+                        CurrencyAmount::from_raw_amount(TOKEN0.clone(), 4500).unwrap(),
+                        Route::new(
+                            vec![POOL_0_1.clone(), POOL_ETH_1.clone()],
+                            TOKEN0.clone(),
+                            ETHER.clone(),
+                        )
+                        .unwrap(),
+                    ),
+                    (
+                        CurrencyAmount::from_raw_amount(TOKEN0.clone(), 5500).unwrap(),
+                        Route::new(
+                            vec![POOL_0_1.clone(), POOL_1_2.clone(), POOL_ETH_2.clone()],
+                            TOKEN0.clone(),
+                            ETHER.clone(),
+                        )
+                        .unwrap(),
+                    ),
+                ],
+                TradeType::ExactInput,
+            );
+        }
     }
 }

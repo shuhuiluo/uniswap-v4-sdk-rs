@@ -4,13 +4,13 @@ use uniswap_v3_sdk::prelude::TickDataProvider;
 
 #[inline]
 pub fn amount_with_path_currency<TP: TickDataProvider>(
-    amount: CurrencyAmount<Currency>,
+    amount: &CurrencyAmount<impl BaseCurrency>,
     pool: &Pool<TP>,
 ) -> Result<CurrencyAmount<Currency>, Error> {
     Ok(CurrencyAmount::from_fractional_amount(
         get_path_currency(&amount.currency, pool)?,
-        amount.numerator,
-        amount.denominator,
+        amount.numerator.clone(),
+        amount.denominator.clone(),
     )?)
 }
 
