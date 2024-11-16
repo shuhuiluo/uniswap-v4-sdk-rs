@@ -583,7 +583,7 @@ where
                 assert!(amount.currency.equals(&route.output), "OUTPUT");
                 // Account for trades that wrap/unwrap as a last step
                 let mut token_amount =
-                    amount_with_path_currency(&amount, &route.pools.last().unwrap())?;
+                    amount_with_path_currency(&amount, route.pools.last().unwrap())?;
                 for pool in route.pools.iter().rev() {
                     (token_amount, _) = pool.get_input_amount(&token_amount, None)?;
                 }
