@@ -498,7 +498,7 @@ mod tests {
             .unwrap();
             let route2 = Route::new(vec![DAI_WETH.clone()], DAI.clone(), WETH.clone()).unwrap();
             let trade = Trade::from_routes(
-                vec![(amount.clone(), route1), (amount.clone(), route2)],
+                vec![(amount.clone(), route1), (amount, route2)],
                 TradeType::ExactOutput,
             )
             .unwrap();
