@@ -2,6 +2,14 @@
 name = "uniswap-v4-sdk-rs"
 version = "0.1.0"
 edition = "2021"
+authors = ["Shuhui Luo <twitter.com/aureliano_law>"]
+description = "Uniswap V3 SDK for Rust"
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/shuhuiluo/uniswap-v4-sdk-rs"
+categories = ["cryptography::cryptocurrencies", "finance", "no-std"]
+keywords = ["uniswap-v4", "ethereum", "sdk"]
+exclude = [".github", ".gitignore", "rustfmt.toml"]
 
 [dependencies]
 alloy-primitives = "0.8"
