@@ -19,3 +19,126 @@ pub fn parse_calldata(calldata: &Bytes) -> Result<V4RouterCall, Error> {
             .collect::<Result<Vec<Actions>, Error>>()?,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{prelude::*, tests::*};
+    use alloy_primitives::{address, uint, Address, U160, U256};
+    use once_cell::sync::Lazy;
+    use uniswap_v3_sdk::{constants::FeeAmount, prelude::encode_sqrt_ratio_x96};
+
+    const ADDRESS_ONE: Address = address!("0000000000000000000000000000000000000001");
+    const ADDRESS_TWO: Address = address!("0000000000000000000000000000000000000002");
+    const AMOUNT: U256 = uint!(1_000_000_000_000_000_000_U256);
+
+    static USDC_WETH: Lazy<Pool> = Lazy::new(|| {
+        Pool::new(
+            USDC.clone().into(),
+            WETH.clone().into(),
+            FeeAmount::MEDIUM.into(),
+            10,
+            Address::ZERO,
+            encode_sqrt_ratio_x96(1, 1),
+            0,
+        )
+        .unwrap()
+    });
+
+    #[test]
+    fn test_parse_calldata() {
+        let tests: Vec<Actions> = vec![
+            Actions::SWEEP(SweepParams {
+                currency: ADDRESS_ONE,
+                recipient: ADDRESS_TWO,
+            }),
+            Actions::CLOSE_CURRENCY(CloseCurrencyParams {
+                currency: ADDRESS_ONE,
+            }),
+            Actions::SETTLE_TAKE_PAIR(SettleTakePairParams {
+                settleCurrency: ADDRESS_ONE,
+                takeCurrency: ADDRESS_TWO,
+            }),
+            Actions::TAKE_PAIR(TakePairParams {
+                currency0: ADDRESS_ONE,
+                currency1: ADDRESS_TWO,
+                recipient: ADDRESS_ONE,
+            }),
+            Actions::TAKE_PORTION(TakePortionParams {
+                currency: ADDRESS_ONE,
+                recipient: ADDRESS_TWO,
+                bips: AMOUNT,
+            }),
+            Actions::TAKE_ALL(TakeAllParams {
+                currency: ADDRESS_ONE,
+                minAmount: AMOUNT,
+            }),
+            Actions::TAKE(TakeParams {
+                currency: ADDRESS_ONE,
+                recipient: ADDRESS_TWO,
+                amount: AMOUNT,
+            }),
+            Actions::SETTLE_PAIR(SettlePairParams {
+                currency0: ADDRESS_ONE,
+                currency1: ADDRESS_TWO,
+            }),
+            Actions::SETTLE(SettleParams {
+                currency: ADDRESS_ONE,
+                amount: AMOUNT,
+                payerIsUser: true,
+            }),
+            Actions::SWAP_EXACT_IN_SINGLE(SwapExactInSingleParams {
+                poolKey: USDC_WETH.pool_key.clone(),
+                zeroForOne: true,
+                amountIn: AMOUNT.try_into().unwrap(),
+                amountOutMinimum: AMOUNT.try_into().unwrap(),
+                sqrtPriceLimitX96: U160::ZERO,
+                hookData: Bytes::default(),
+            }),
+            Actions::SWAP_EXACT_OUT_SINGLE(SwapExactOutSingleParams {
+                poolKey: USDC_WETH.pool_key.clone(),
+                zeroForOne: true,
+                amountOut: AMOUNT.try_into().unwrap(),
+                amountInMaximum: AMOUNT.try_into().unwrap(),
+                sqrtPriceLimitX96: U160::ZERO,
+                hookData: Bytes::default(),
+            }),
+            Actions::SWAP_EXACT_IN(SwapExactInParams {
+                currencyIn: DAI.address,
+                path: encode_route_to_path(
+                    &Route::new(
+                        vec![DAI_USDC.clone(), USDC_WETH.clone()],
+                        DAI.clone(),
+                        WETH.clone(),
+                    )
+                    .unwrap(),
+                    false,
+                ),
+                amountIn: AMOUNT.try_into().unwrap(),
+                amountOutMinimum: AMOUNT.try_into().unwrap(),
+            }),
+            Actions::SWAP_EXACT_OUT(SwapExactOutParams {
+                currencyOut: DAI.address,
+                path: encode_route_to_path(
+                    &Route::new(
+                        vec![DAI_USDC.clone(), USDC_WETH.clone()],
+                        DAI.clone(),
+                        WETH.clone(),
+                    )
+                    .unwrap(),
+                    false,
+                ),
+                amountOut: AMOUNT.try_into().unwrap(),
+                amountInMaximum: AMOUNT.try_into().unwrap(),
+            }),
+        ];
+
+        for test in tests {
+            let mut planner = V4Planner::default();
+            planner.add_action(&test);
+            let calldata = planner.finalize();
+            let result = parse_calldata(&calldata).unwrap();
+            assert_eq!(result.actions, vec![test]);
+        }
+    }
+}
