@@ -18,7 +18,7 @@ derive_more = "1.0.0"
 rustc-hash = "2.1.0"
 thiserror = { version = "2", default-features = false }
 uniswap-sdk-core = "3.2.0"
-uniswap-v3-sdk = "2.9.0"
+uniswap-v3-sdk = "2.9.1"
 
 [dev-dependencies]
 alloy-signer = "0.8"

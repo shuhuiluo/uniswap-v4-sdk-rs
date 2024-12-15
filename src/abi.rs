@@ -179,7 +179,7 @@ sol! {
         /// @notice The permit message signed for a single token allowance
         #[derive(Debug, Default, PartialEq, Eq)]
         struct PermitSingle {
-            // the permit data for a single token alownce
+            // the permit data for a single token allowance
             PermitDetails details;
             // address permissioned on the allowed tokens
             address spender;
