@@ -161,4 +161,56 @@ sol! {
         bytes actions;
         bytes[] params;
     }
+
+    interface IAllowanceTransfer {
+        /// @notice The permit data for a token
+        #[derive(Debug, Default, PartialEq, Eq)]
+        struct PermitDetails {
+            // ERC20 token address
+            address token;
+            // the maximum amount allowed to spend
+            uint160 amount;
+            // timestamp at which a spender's token allowances become invalid
+            uint48 expiration;
+            // an incrementing value indexed per owner,token,and spender for each signature
+            uint48 nonce;
+        }
+
+        /// @notice The permit message signed for a single token allowance
+        #[derive(Debug, Default, PartialEq, Eq)]
+        struct PermitSingle {
+            // the permit data for a single token alownce
+            PermitDetails details;
+            // address permissioned on the allowed tokens
+            address spender;
+            // deadline on the permit signature
+            uint256 sigDeadline;
+        }
+
+        /// @notice The permit message signed for multiple token allowances
+        #[derive(Debug, Default, PartialEq, Eq)]
+        struct PermitBatch {
+            // the permit data for multiple token allowances
+            PermitDetails[] details;
+            // address permissioned on the allowed tokens
+            address spender;
+            // deadline on the permit signature
+            uint256 sigDeadline;
+        }
+    }
+
+    interface IPositionManager {
+        function initializePool(PoolKey calldata key, uint160 sqrtPriceX96) external payable returns (int24);
+
+        function modifyLiquidities(bytes calldata unlockData, uint256 deadline) external payable;
+
+        function permitBatch(address owner, IAllowanceTransfer.PermitBatch calldata _permitBatch, bytes calldata signature)
+            external
+            payable
+            returns (bytes memory err);
+
+        function permit(address spender, uint256 tokenId, uint256 deadline, uint256 nonce, bytes calldata signature)
+            external
+            payable;
+    }
 }
