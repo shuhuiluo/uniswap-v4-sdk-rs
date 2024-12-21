@@ -10,6 +10,7 @@ use uniswap_v3_sdk::prelude::{
 
 pub use uniswap_v3_sdk::prelude::NFTPermitData;
 
+/// Shared Action Constants used in the v4 Router and v4 position manager
 pub const MSG_SENDER: Address = address!("0000000000000000000000000000000000000001");
 
 #[derive(Debug, Clone, PartialEq, Eq)]
