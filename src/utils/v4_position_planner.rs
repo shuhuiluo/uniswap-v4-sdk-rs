@@ -1,20 +1,20 @@
-use crate::{entities::Pool, prelude::*};
+use crate::prelude::*;
 use alloy_primitives::{Address, Bytes, U256};
 use derive_more::{Deref, DerefMut};
 use uniswap_sdk_core::prelude::BaseCurrency;
-use uniswap_v3_sdk::prelude::TickIndex;
+use uniswap_v3_sdk::prelude::{TickDataProvider, TickIndex};
 
 #[derive(Clone, Debug, Default, PartialEq, Deref, DerefMut)]
-pub struct V4PositionPlanner(V4Planner);
+pub struct V4PositionPlanner(pub V4Planner);
 
 impl V4PositionPlanner {
     #[allow(clippy::too_many_arguments)]
     #[inline]
-    pub fn add_mint<I: TickIndex>(
+    pub fn add_mint<TP: TickDataProvider>(
         &mut self,
-        pool: &Pool,
-        tick_lower: I,
-        tick_upper: I,
+        pool: &Pool<TP>,
+        tick_lower: TP::Index,
+        tick_upper: TP::Index,
         liquidity: U256,
         amount0_max: u128,
         amount1_max: u128,
