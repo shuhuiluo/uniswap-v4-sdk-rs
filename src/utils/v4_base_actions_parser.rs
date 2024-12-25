@@ -55,10 +55,6 @@ mod tests {
             Actions::CLOSE_CURRENCY(CloseCurrencyParams {
                 currency: ADDRESS_ONE,
             }),
-            Actions::SETTLE_TAKE_PAIR(SettleTakePairParams {
-                settleCurrency: ADDRESS_ONE,
-                takeCurrency: ADDRESS_TWO,
-            }),
             Actions::TAKE_PAIR(TakePairParams {
                 currency0: ADDRESS_ONE,
                 currency1: ADDRESS_TWO,
