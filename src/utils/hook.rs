@@ -165,72 +165,44 @@ mod tests {
             assert!(permissions(*HOOK_AFTER_INITIALIZE).after_initialize);
             assert!(permissions(ALL_HOOKS_ADDRESS).after_initialize);
             assert!(!permissions(*HOOK_BEFORE_INITIALIZE).after_initialize);
-            assert!(
-                !permissions(*HOOK_BEFORE_ADD_LIQUIDITY).after_initialize
-            );
+            assert!(!permissions(*HOOK_BEFORE_ADD_LIQUIDITY).after_initialize);
             assert!(!permissions(EMPTY_HOOK_ADDRESS).after_initialize);
         }
 
         #[test]
         fn before_add_liquidity() {
-            assert!(
-                permissions(*HOOK_BEFORE_ADD_LIQUIDITY).before_add_liquidity
-            );
+            assert!(permissions(*HOOK_BEFORE_ADD_LIQUIDITY).before_add_liquidity);
             assert!(permissions(ALL_HOOKS_ADDRESS).before_add_liquidity);
-            assert!(
-                !permissions(*HOOK_BEFORE_INITIALIZE).before_add_liquidity
-            );
-            assert!(
-                !permissions(*HOOK_AFTER_ADD_LIQUIDITY).before_add_liquidity
-            );
+            assert!(!permissions(*HOOK_BEFORE_INITIALIZE).before_add_liquidity);
+            assert!(!permissions(*HOOK_AFTER_ADD_LIQUIDITY).before_add_liquidity);
             assert!(!permissions(EMPTY_HOOK_ADDRESS).before_add_liquidity);
         }
 
         #[test]
         fn after_add_liquidity() {
-            assert!(
-                permissions(*HOOK_AFTER_ADD_LIQUIDITY).after_add_liquidity
-            );
+            assert!(permissions(*HOOK_AFTER_ADD_LIQUIDITY).after_add_liquidity);
             assert!(permissions(ALL_HOOKS_ADDRESS).after_add_liquidity);
-            assert!(
-                !permissions(*HOOK_BEFORE_ADD_LIQUIDITY).after_add_liquidity
-            );
-            assert!(
-                !permissions(*HOOK_BEFORE_REMOVE_LIQUIDITY).after_add_liquidity
-            );
+            assert!(!permissions(*HOOK_BEFORE_ADD_LIQUIDITY).after_add_liquidity);
+            assert!(!permissions(*HOOK_BEFORE_REMOVE_LIQUIDITY).after_add_liquidity);
             assert!(!permissions(EMPTY_HOOK_ADDRESS).after_add_liquidity);
         }
 
         #[test]
         fn before_remove_liquidity() {
-            assert!(
-                permissions(*HOOK_BEFORE_REMOVE_LIQUIDITY).before_remove_liquidity
-            );
+            assert!(permissions(*HOOK_BEFORE_REMOVE_LIQUIDITY).before_remove_liquidity);
             assert!(permissions(ALL_HOOKS_ADDRESS).before_remove_liquidity);
-            assert!(
-                !permissions(*HOOK_AFTER_ADD_LIQUIDITY).before_remove_liquidity
-            );
-            assert!(
-                !permissions(*HOOK_AFTER_REMOVE_LIQUIDITY).before_remove_liquidity
-            );
-            assert!(
-                !permissions(EMPTY_HOOK_ADDRESS).before_remove_liquidity
-            );
+            assert!(!permissions(*HOOK_AFTER_ADD_LIQUIDITY).before_remove_liquidity);
+            assert!(!permissions(*HOOK_AFTER_REMOVE_LIQUIDITY).before_remove_liquidity);
+            assert!(!permissions(EMPTY_HOOK_ADDRESS).before_remove_liquidity);
         }
 
         #[test]
         fn after_remove_liquidity() {
-            assert!(
-                permissions(*HOOK_AFTER_REMOVE_LIQUIDITY).after_remove_liquidity
-            );
+            assert!(permissions(*HOOK_AFTER_REMOVE_LIQUIDITY).after_remove_liquidity);
             assert!(permissions(ALL_HOOKS_ADDRESS).after_remove_liquidity);
-            assert!(
-                !permissions(*HOOK_BEFORE_REMOVE_LIQUIDITY).after_remove_liquidity
-            );
+            assert!(!permissions(*HOOK_BEFORE_REMOVE_LIQUIDITY).after_remove_liquidity);
             assert!(!permissions(*HOOK_BEFORE_SWAP).after_remove_liquidity);
-            assert!(
-                !permissions(EMPTY_HOOK_ADDRESS).after_remove_liquidity
-            );
+            assert!(!permissions(EMPTY_HOOK_ADDRESS).after_remove_liquidity);
         }
 
         #[test]
@@ -265,48 +237,26 @@ mod tests {
             assert!(permissions(*HOOK_AFTER_DONATE).after_donate);
             assert!(permissions(ALL_HOOKS_ADDRESS).after_donate);
             assert!(!permissions(*HOOK_BEFORE_DONATE).after_donate);
-            assert!(
-                !permissions(*HOOK_BEFORE_SWAP_RETURNS_DELTA).after_donate
-            );
+            assert!(!permissions(*HOOK_BEFORE_SWAP_RETURNS_DELTA).after_donate);
             assert!(!permissions(EMPTY_HOOK_ADDRESS).after_donate);
         }
 
         #[test]
         fn before_swap_returns_delta() {
-            assert!(
-                permissions(*HOOK_BEFORE_SWAP_RETURNS_DELTA).before_swap_returns_delta
-            );
-            assert!(
-                permissions(ALL_HOOKS_ADDRESS).before_swap_returns_delta
-            );
-            assert!(
-                !permissions(*HOOK_AFTER_DONATE).before_swap_returns_delta
-            );
-            assert!(
-                !permissions(*HOOK_AFTER_SWAP_RETURNS_DELTA).before_swap_returns_delta
-            );
-            assert!(
-                !permissions(EMPTY_HOOK_ADDRESS).before_swap_returns_delta
-            );
+            assert!(permissions(*HOOK_BEFORE_SWAP_RETURNS_DELTA).before_swap_returns_delta);
+            assert!(permissions(ALL_HOOKS_ADDRESS).before_swap_returns_delta);
+            assert!(!permissions(*HOOK_AFTER_DONATE).before_swap_returns_delta);
+            assert!(!permissions(*HOOK_AFTER_SWAP_RETURNS_DELTA).before_swap_returns_delta);
+            assert!(!permissions(EMPTY_HOOK_ADDRESS).before_swap_returns_delta);
         }
 
         #[test]
         fn after_swap_returns_delta() {
-            assert!(
-                permissions(*HOOK_AFTER_SWAP_RETURNS_DELTA).after_swap_returns_delta
-            );
-            assert!(
-                permissions(ALL_HOOKS_ADDRESS).after_swap_returns_delta
-            );
-            assert!(
-                !permissions(*HOOK_BEFORE_SWAP_RETURNS_DELTA).after_swap_returns_delta
-            );
-            assert!(
-                !permissions(*HOOK_AFTER_ADD_LIQUIDITY_RETURNS_DELTA).after_swap_returns_delta
-            );
-            assert!(
-                !permissions(EMPTY_HOOK_ADDRESS).after_swap_returns_delta
-            );
+            assert!(permissions(*HOOK_AFTER_SWAP_RETURNS_DELTA).after_swap_returns_delta);
+            assert!(permissions(ALL_HOOKS_ADDRESS).after_swap_returns_delta);
+            assert!(!permissions(*HOOK_BEFORE_SWAP_RETURNS_DELTA).after_swap_returns_delta);
+            assert!(!permissions(*HOOK_AFTER_ADD_LIQUIDITY_RETURNS_DELTA).after_swap_returns_delta);
+            assert!(!permissions(EMPTY_HOOK_ADDRESS).after_swap_returns_delta);
         }
 
         #[test]
@@ -315,19 +265,13 @@ mod tests {
                 permissions(*HOOK_AFTER_ADD_LIQUIDITY_RETURNS_DELTA)
                     .after_add_liquidity_returns_delta
             );
-            assert!(
-                permissions(ALL_HOOKS_ADDRESS).after_add_liquidity_returns_delta
-            );
-            assert!(
-                !permissions(*HOOK_AFTER_SWAP_RETURNS_DELTA).after_add_liquidity_returns_delta
-            );
+            assert!(permissions(ALL_HOOKS_ADDRESS).after_add_liquidity_returns_delta);
+            assert!(!permissions(*HOOK_AFTER_SWAP_RETURNS_DELTA).after_add_liquidity_returns_delta);
             assert!(
                 !permissions(*HOOK_AFTER_REMOVE_LIQUIDITY_RETURNS_DELTA)
                     .after_add_liquidity_returns_delta
             );
-            assert!(
-                !permissions(EMPTY_HOOK_ADDRESS).after_add_liquidity_returns_delta
-            );
+            assert!(!permissions(EMPTY_HOOK_ADDRESS).after_add_liquidity_returns_delta);
         }
 
         #[test]
@@ -336,9 +280,7 @@ mod tests {
                 permissions(*HOOK_AFTER_REMOVE_LIQUIDITY_RETURNS_DELTA)
                     .after_remove_liquidity_returns_delta
             );
-            assert!(
-                permissions(ALL_HOOKS_ADDRESS).after_remove_liquidity_returns_delta
-            );
+            assert!(permissions(ALL_HOOKS_ADDRESS).after_remove_liquidity_returns_delta);
             assert!(
                 !permissions(*HOOK_AFTER_ADD_LIQUIDITY_RETURNS_DELTA)
                     .after_remove_liquidity_returns_delta
@@ -346,9 +288,7 @@ mod tests {
             assert!(
                 !permissions(*HOOK_BEFORE_SWAP_RETURNS_DELTA).after_remove_liquidity_returns_delta
             );
-            assert!(
-                !permissions(EMPTY_HOOK_ADDRESS).after_remove_liquidity_returns_delta
-            );
+            assert!(!permissions(EMPTY_HOOK_ADDRESS).after_remove_liquidity_returns_delta);
         }
     }
 
@@ -357,166 +297,155 @@ mod tests {
 
         #[test]
         fn before_initialize() {
-            assert!(
-                has_permission(*HOOK_BEFORE_INITIALIZE, HookOptions::BeforeInitialize)
-            );
-            assert!(
-                !has_permission(EMPTY_HOOK_ADDRESS, HookOptions::BeforeInitialize)
-            );
+            assert!(has_permission(
+                *HOOK_BEFORE_INITIALIZE,
+                HookOptions::BeforeInitialize
+            ));
+            assert!(!has_permission(
+                EMPTY_HOOK_ADDRESS,
+                HookOptions::BeforeInitialize
+            ));
         }
 
         #[test]
         fn after_initialize() {
-            assert!(
-                has_permission(*HOOK_AFTER_INITIALIZE, HookOptions::AfterInitialize)
-            );
-            assert!(
-                !has_permission(EMPTY_HOOK_ADDRESS, HookOptions::AfterInitialize)
-            );
+            assert!(has_permission(
+                *HOOK_AFTER_INITIALIZE,
+                HookOptions::AfterInitialize
+            ));
+            assert!(!has_permission(
+                EMPTY_HOOK_ADDRESS,
+                HookOptions::AfterInitialize
+            ));
         }
 
         #[test]
         fn before_add_liquidity() {
-            assert!(
-                has_permission(*HOOK_BEFORE_ADD_LIQUIDITY, HookOptions::BeforeAddLiquidity)
-            );
-            assert!(
-                !has_permission(EMPTY_HOOK_ADDRESS, HookOptions::BeforeAddLiquidity)
-            );
+            assert!(has_permission(
+                *HOOK_BEFORE_ADD_LIQUIDITY,
+                HookOptions::BeforeAddLiquidity
+            ));
+            assert!(!has_permission(
+                EMPTY_HOOK_ADDRESS,
+                HookOptions::BeforeAddLiquidity
+            ));
         }
 
         #[test]
         fn after_add_liquidity() {
-            assert!(
-                has_permission(*HOOK_AFTER_ADD_LIQUIDITY, HookOptions::AfterAddLiquidity)
-            );
-            assert!(
-                !has_permission(EMPTY_HOOK_ADDRESS, HookOptions::AfterAddLiquidity)
-            );
+            assert!(has_permission(
+                *HOOK_AFTER_ADD_LIQUIDITY,
+                HookOptions::AfterAddLiquidity
+            ));
+            assert!(!has_permission(
+                EMPTY_HOOK_ADDRESS,
+                HookOptions::AfterAddLiquidity
+            ));
         }
 
         #[test]
         fn before_remove_liquidity() {
-            assert!(
-                has_permission(
-                    *HOOK_BEFORE_REMOVE_LIQUIDITY,
-                    HookOptions::BeforeRemoveLiquidity
-                )
-            );
-            assert!(
-                !has_permission(EMPTY_HOOK_ADDRESS, HookOptions::BeforeRemoveLiquidity)
-            );
+            assert!(has_permission(
+                *HOOK_BEFORE_REMOVE_LIQUIDITY,
+                HookOptions::BeforeRemoveLiquidity
+            ));
+            assert!(!has_permission(
+                EMPTY_HOOK_ADDRESS,
+                HookOptions::BeforeRemoveLiquidity
+            ));
         }
 
         #[test]
         fn after_remove_liquidity() {
-            assert!(
-                has_permission(
-                    *HOOK_AFTER_REMOVE_LIQUIDITY,
-                    HookOptions::AfterRemoveLiquidity
-                )
-            );
-            assert!(
-                !has_permission(EMPTY_HOOK_ADDRESS, HookOptions::AfterRemoveLiquidity)
-            );
+            assert!(has_permission(
+                *HOOK_AFTER_REMOVE_LIQUIDITY,
+                HookOptions::AfterRemoveLiquidity
+            ));
+            assert!(!has_permission(
+                EMPTY_HOOK_ADDRESS,
+                HookOptions::AfterRemoveLiquidity
+            ));
         }
 
         #[test]
         fn before_swap() {
-            assert!(
-                has_permission(*HOOK_BEFORE_SWAP, HookOptions::BeforeSwap)
-            );
-            assert!(
-                !has_permission(EMPTY_HOOK_ADDRESS, HookOptions::BeforeSwap)
-            );
+            assert!(has_permission(*HOOK_BEFORE_SWAP, HookOptions::BeforeSwap));
+            assert!(!has_permission(EMPTY_HOOK_ADDRESS, HookOptions::BeforeSwap));
         }
 
         #[test]
         fn after_swap() {
-            assert!(
-                has_permission(*HOOK_AFTER_SWAP, HookOptions::AfterSwap)
-            );
-            assert!(
-                !has_permission(EMPTY_HOOK_ADDRESS, HookOptions::AfterSwap)
-            );
+            assert!(has_permission(*HOOK_AFTER_SWAP, HookOptions::AfterSwap));
+            assert!(!has_permission(EMPTY_HOOK_ADDRESS, HookOptions::AfterSwap));
         }
 
         #[test]
         fn before_donate() {
-            assert!(
-                has_permission(*HOOK_BEFORE_DONATE, HookOptions::BeforeDonate)
-            );
-            assert!(
-                !has_permission(EMPTY_HOOK_ADDRESS, HookOptions::BeforeDonate)
-            );
+            assert!(has_permission(
+                *HOOK_BEFORE_DONATE,
+                HookOptions::BeforeDonate
+            ));
+            assert!(!has_permission(
+                EMPTY_HOOK_ADDRESS,
+                HookOptions::BeforeDonate
+            ));
         }
 
         #[test]
         fn after_donate() {
-            assert!(
-                has_permission(*HOOK_AFTER_DONATE, HookOptions::AfterDonate)
-            );
-            assert!(
-                !has_permission(EMPTY_HOOK_ADDRESS, HookOptions::AfterDonate)
-            );
+            assert!(has_permission(*HOOK_AFTER_DONATE, HookOptions::AfterDonate));
+            assert!(!has_permission(
+                EMPTY_HOOK_ADDRESS,
+                HookOptions::AfterDonate
+            ));
         }
 
         #[test]
         fn before_swap_returns_delta() {
-            assert!(
-                has_permission(
-                    *HOOK_BEFORE_SWAP_RETURNS_DELTA,
-                    HookOptions::BeforeSwapReturnsDelta
-                )
-            );
-            assert!(
-                !has_permission(EMPTY_HOOK_ADDRESS, HookOptions::BeforeSwapReturnsDelta)
-            );
+            assert!(has_permission(
+                *HOOK_BEFORE_SWAP_RETURNS_DELTA,
+                HookOptions::BeforeSwapReturnsDelta
+            ));
+            assert!(!has_permission(
+                EMPTY_HOOK_ADDRESS,
+                HookOptions::BeforeSwapReturnsDelta
+            ));
         }
 
         #[test]
         fn after_swap_returns_delta() {
-            assert!(
-                has_permission(
-                    *HOOK_AFTER_SWAP_RETURNS_DELTA,
-                    HookOptions::AfterSwapReturnsDelta
-                )
-            );
-            assert!(
-                !has_permission(EMPTY_HOOK_ADDRESS, HookOptions::AfterSwapReturnsDelta)
-            );
+            assert!(has_permission(
+                *HOOK_AFTER_SWAP_RETURNS_DELTA,
+                HookOptions::AfterSwapReturnsDelta
+            ));
+            assert!(!has_permission(
+                EMPTY_HOOK_ADDRESS,
+                HookOptions::AfterSwapReturnsDelta
+            ));
         }
 
         #[test]
         fn after_add_liquidity_returns_delta() {
-            assert!(
-                has_permission(
-                    *HOOK_AFTER_ADD_LIQUIDITY_RETURNS_DELTA,
-                    HookOptions::AfterAddLiquidityReturnsDelta
-                )
-            );
-            assert!(
-                !has_permission(
-                    EMPTY_HOOK_ADDRESS,
-                    HookOptions::AfterAddLiquidityReturnsDelta
-                )
-            );
+            assert!(has_permission(
+                *HOOK_AFTER_ADD_LIQUIDITY_RETURNS_DELTA,
+                HookOptions::AfterAddLiquidityReturnsDelta
+            ));
+            assert!(!has_permission(
+                EMPTY_HOOK_ADDRESS,
+                HookOptions::AfterAddLiquidityReturnsDelta
+            ));
         }
 
         #[test]
         fn after_remove_liquidity_returns_delta() {
-            assert!(
-                has_permission(
-                    *HOOK_AFTER_REMOVE_LIQUIDITY_RETURNS_DELTA,
-                    HookOptions::AfterRemoveLiquidityReturnsDelta
-                )
-            );
-            assert!(
-                !has_permission(
-                    EMPTY_HOOK_ADDRESS,
-                    HookOptions::AfterRemoveLiquidityReturnsDelta
-                )
-            );
+            assert!(has_permission(
+                *HOOK_AFTER_REMOVE_LIQUIDITY_RETURNS_DELTA,
+                HookOptions::AfterRemoveLiquidityReturnsDelta
+            ));
+            assert!(!has_permission(
+                EMPTY_HOOK_ADDRESS,
+                HookOptions::AfterRemoveLiquidityReturnsDelta
+            ));
         }
     }
 
@@ -554,23 +483,19 @@ mod tests {
 
         #[test]
         fn before_remove_liquidity() {
-            assert!(
-                has_liquidity_permissions(*HOOK_BEFORE_REMOVE_LIQUIDITY)
-            );
+            assert!(has_liquidity_permissions(*HOOK_BEFORE_REMOVE_LIQUIDITY));
         }
 
         #[test]
         fn after_remove_liquidity() {
-            assert!(
-                has_liquidity_permissions(*HOOK_AFTER_REMOVE_LIQUIDITY)
-            );
+            assert!(has_liquidity_permissions(*HOOK_AFTER_REMOVE_LIQUIDITY));
         }
 
         #[test]
         fn non_liquidity() {
-            assert!(
-                !has_liquidity_permissions(*HOOK_AFTER_REMOVE_LIQUIDITY_RETURNS_DELTA)
-            );
+            assert!(!has_liquidity_permissions(
+                *HOOK_AFTER_REMOVE_LIQUIDITY_RETURNS_DELTA
+            ));
         }
     }
 
