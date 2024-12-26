@@ -1,5 +1,5 @@
-use crate::prelude::{tick_to_price, Error, Pool};
-use alloy_primitives::{uint, U160, U256};
+use crate::prelude::{tick_to_price, Error, Pool, *};
+use alloy_primitives::{aliases::U48, uint, U160, U256};
 use uniswap_sdk_core::prelude::*;
 use uniswap_v3_sdk::prelude::*;
 
@@ -407,44 +407,44 @@ impl<TP: TickDataProvider> Position<TP> {
         Ok(amounts)
     }
 
-    // /// Returns the [`AllowanceTransferPermitBatch`] for adding liquidity to a position
-    // ///
-    // /// ## Arguments
-    // ///
-    // /// * `slippage_tolerance`: The amount by which the price can 'slip' before the transaction
-    // will ///   revert
-    // /// * `spender`: The spender of the permit (should usually be the [`PositionManager`])
-    // /// * `nonce`: A valid permit2 nonce
-    // /// * `deadline`: The deadline for the permit
-    // #[inline]
-    // pub fn permit_batch_data(
-    //     &mut self,
-    //     slippage_tolerance: Percent,
-    //     spender: String,
-    //     nonce: U256,
-    //     deadline: U256,
-    // ) -> Result<AllowanceTransferPermitBatch, Error> {
-    //     let MintAmounts { amount0, amount1 } =
-    //         self.mint_amounts_with_slippage(&slippage_tolerance)?;
-    //     Ok(AllowanceTransferPermitBatch {
-    //         details: vec![
-    //             AllowanceTransferPermitDetails {
-    //                 token: self.pool.currency0.wrapped().address(),
-    //                 amount: amount0,
-    //                 expiration: deadline,
-    //                 nonce,
-    //             },
-    //             AllowanceTransferPermitDetails {
-    //                 token: self.pool.currency1.wrapped().address(),
-    //                 amount: amount1,
-    //                 expiration: deadline,
-    //                 nonce,
-    //             },
-    //         ],
-    //         spender,
-    //         sig_deadline: deadline,
-    //     })
-    // }
+    /// Returns the [`AllowanceTransferPermitBatch`] for adding liquidity to a position
+    ///
+    /// ## Arguments
+    ///
+    /// * `slippage_tolerance`: The amount by which the price can 'slip' before the transaction will
+    ///   revert
+    /// * `spender`: The spender of the permit (should usually be the [`PositionManager`])
+    /// * `nonce`: A valid permit2 nonce
+    /// * `deadline`: The deadline for the permit
+    #[inline]
+    pub fn permit_batch_data(
+        &mut self,
+        slippage_tolerance: &Percent,
+        spender: Address,
+        nonce: U256,
+        deadline: U256,
+    ) -> Result<AllowanceTransferPermitBatch, Error> {
+        let MintAmounts { amount0, amount1 } =
+            self.mint_amounts_with_slippage(slippage_tolerance)?;
+        Ok(AllowanceTransferPermitBatch {
+            details: vec![
+                IAllowanceTransfer::PermitDetails {
+                    token: self.pool.currency0.wrapped().address(),
+                    amount: U160::from(amount0),
+                    expiration: U48::from(deadline),
+                    nonce: U48::from(nonce),
+                },
+                IAllowanceTransfer::PermitDetails {
+                    token: self.pool.currency1.wrapped().address(),
+                    amount: U160::from(amount1),
+                    expiration: U48::from(deadline),
+                    nonce: U48::from(nonce),
+                },
+            ],
+            spender,
+            sigDeadline: deadline,
+        })
+    }
 
     /// Computes the maximum amount of liquidity received for a given amount of token0, token1,
     /// and the prices at the tick boundaries.

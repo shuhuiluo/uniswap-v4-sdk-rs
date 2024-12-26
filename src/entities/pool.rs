@@ -288,7 +288,7 @@ impl<TP: TickDataProvider> Pool<TP> {
         amount_specified: I256,
         sqrt_price_limit_x96: Option<U160>,
     ) -> Result<SwapState<TP::Index>, Error> {
-        if self.non_impactful_hook() {
+        if !self.hook_impacts_swap() {
             Ok(v3_swap(
                 self.fee,
                 self.sqrt_price_x96,
@@ -305,8 +305,10 @@ impl<TP: TickDataProvider> Pool<TP> {
         }
     }
 
-    fn non_impactful_hook(&self) -> bool {
-        self.hooks == Address::ZERO
+    const fn hook_impacts_swap(&self) -> bool {
+        // could use this function to clear certain hooks that may have swap Permissions, but we
+        // know they don't interfere in the swap outcome
+        has_swap_permissions(self.hooks)
     }
 }
 
