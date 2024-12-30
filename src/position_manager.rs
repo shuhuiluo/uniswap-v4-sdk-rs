@@ -358,7 +358,6 @@ pub fn collect_call_parameters<TP: TickDataProvider>(
     position: &Position<TP>,
     options: CollectOptions,
 ) -> MethodParameters {
-    let mut calldatas: Vec<Bytes> = Vec::with_capacity(1);
     let mut planner = V4PositionPlanner::default();
 
     // To collect fees in V4, we need to:
@@ -378,13 +377,8 @@ pub fn collect_call_parameters<TP: TickDataProvider>(
         options.recipient,
     );
 
-    calldatas.push(encode_modify_liquidities(
-        planner.0.finalize(),
-        options.common_opts.deadline,
-    ));
-
     MethodParameters {
-        calldata: encode_multicall(calldatas),
+        calldata: encode_modify_liquidities(planner.0.finalize(), options.common_opts.deadline),
         value: U256::ZERO,
     }
 }

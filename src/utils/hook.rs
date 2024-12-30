@@ -67,7 +67,7 @@ pub const fn permissions(address: Address) -> HookPermissions {
 #[inline]
 #[must_use]
 pub const fn has_permission(address: Address, hook_option: HookOptions) -> bool {
-    let mask = (address.0 .0[18] as u64) << 8 | (address.0 .0[19] as u64);
+    let mask = ((address.0 .0[18] as u64) << 8) | (address.0 .0[19] as u64);
     let hook_flag_index = hook_option as u64;
     mask & (1 << hook_flag_index) != 0
 }
