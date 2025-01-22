@@ -24,7 +24,7 @@ pub fn parse_calldata(calldata: &Bytes) -> Result<V4RouterCall, Error> {
 mod tests {
     use super::*;
     use crate::{prelude::*, tests::*};
-    use alloy_primitives::{address, uint, Address, U160, U256};
+    use alloy_primitives::{address, uint, Address, U256};
     use once_cell::sync::Lazy;
     use uniswap_v3_sdk::prelude::{encode_sqrt_ratio_x96, FeeAmount};
 
@@ -88,7 +88,6 @@ mod tests {
                 zeroForOne: true,
                 amountIn: AMOUNT.try_into().unwrap(),
                 amountOutMinimum: AMOUNT.try_into().unwrap(),
-                sqrtPriceLimitX96: U160::ZERO,
                 hookData: Bytes::default(),
             }),
             Actions::SWAP_EXACT_OUT_SINGLE(SwapExactOutSingleParams {
@@ -96,7 +95,6 @@ mod tests {
                 zeroForOne: true,
                 amountOut: AMOUNT.try_into().unwrap(),
                 amountInMaximum: AMOUNT.try_into().unwrap(),
-                sqrtPriceLimitX96: U160::ZERO,
                 hookData: Bytes::default(),
             }),
             Actions::SWAP_EXACT_IN(SwapExactInParams {
