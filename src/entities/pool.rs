@@ -438,6 +438,7 @@ mod tests {
 
     mod constructor {
         use super::*;
+        use alloy_primitives::address;
 
         #[test]
         #[should_panic(expected = "Core(ChainIdMismatch(1, 3))")]

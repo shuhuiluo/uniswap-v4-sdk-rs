@@ -3,6 +3,7 @@ use alloc::vec::Vec;
 use alloy_primitives::{address, Address, Bytes, PrimitiveSignature, U160, U256};
 use alloy_sol_types::{eip712_domain, SolCall};
 use derive_more::{Deref, DerefMut};
+use num_traits::ToPrimitive;
 use uniswap_sdk_core::prelude::*;
 use uniswap_v3_sdk::prelude::{
     IERC721Permit, MethodParameters, MintAmounts, TickDataProvider, TickIndex,
@@ -452,9 +453,8 @@ pub fn encode_erc721_permit(
 /// ## Examples
 ///
 /// ```
+/// use alloy::signers::{local::PrivateKeySigner, SignerSync};
 /// use alloy_primitives::{address, b256, uint, PrimitiveSignature, B256};
-/// use alloy_signer::SignerSync;
-/// use alloy_signer_local::PrivateKeySigner;
 /// use alloy_sol_types::SolStruct;
 /// use uniswap_v4_sdk::prelude::*;
 ///
@@ -475,7 +475,7 @@ pub fn encode_erc721_permit(
 /// );
 ///
 /// // Derive the EIP-712 signing hash.
-/// let hash: B256 = data.values.eip712_signing_hash(&data.domain);
+/// let hash: B256 = data.eip712_signing_hash();
 ///
 /// let signer = PrivateKeySigner::random();
 /// let signature: PrimitiveSignature = signer.sign_hash_sync(&hash).unwrap();

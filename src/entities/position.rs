@@ -1,5 +1,7 @@
 use crate::prelude::{tick_to_price, Error, Pool, *};
+use alloc::vec;
 use alloy_primitives::{aliases::U48, uint, U160, U256};
+use num_traits::ToPrimitive;
 use uniswap_sdk_core::prelude::*;
 use uniswap_v3_sdk::prelude::*;
 
@@ -103,7 +105,7 @@ impl<TP: TickDataProvider> Position<TP> {
                 .to_big_int(),
             )
         } else {
-            CurrencyAmount::from_raw_amount(self.pool.currency0.clone(), BigInt::zero())
+            CurrencyAmount::from_raw_amount(self.pool.currency0.clone(), BigInt::ZERO)
         }
         .map_err(Error::Core)
     }
@@ -125,7 +127,7 @@ impl<TP: TickDataProvider> Position<TP> {
     #[inline]
     pub fn amount1(&self) -> Result<CurrencyAmount<Currency>, Error> {
         if self.pool.tick_current < self.tick_lower {
-            CurrencyAmount::from_raw_amount(self.pool.currency1.clone(), BigInt::zero())
+            CurrencyAmount::from_raw_amount(self.pool.currency1.clone(), BigInt::ZERO)
         } else if self.pool.tick_current < self.tick_upper {
             CurrencyAmount::from_raw_amount(
                 self.pool.currency1.clone(),

@@ -1,6 +1,7 @@
 use crate::prelude::{encode_route_to_path, Error, Trade, *};
 use alloy_primitives::{Bytes, U256};
 use alloy_sol_types::SolValue;
+use num_traits::ToPrimitive;
 use uniswap_sdk_core::prelude::*;
 use uniswap_v3_sdk::prelude::*;
 
@@ -541,7 +542,7 @@ mod tests {
 
     mod add_take {
         use super::*;
-        use alloy_primitives::uint;
+        use alloy_primitives::{address, uint};
 
         #[test]
         fn completes_v4_take_without_specified_amount() {

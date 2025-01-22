@@ -1,6 +1,8 @@
 use crate::prelude::{amount_with_path_currency, Error, Pool, Route};
-use rustc_hash::FxHashSet;
-use uniswap_sdk_core::prelude::{sorted_insert::sorted_insert, *};
+use alloc::vec;
+use alloy_primitives::map::rustc_hash::FxHashSet;
+use core::cmp::Ordering;
+use uniswap_sdk_core::prelude::{sorted_insert, *};
 use uniswap_v3_sdk::prelude::*;
 
 /// Trades comparator, an extension of the input output comparator that also considers other
@@ -113,14 +115,14 @@ where
 
     /// Returns the input currency of the swap
     #[inline]
-    pub fn input_currency(&self) -> &TInput {
-        &self.input_amount.currency
+    pub const fn input_currency(&self) -> &TInput {
+        &self.input_amount.meta.currency
     }
 
     /// Returns the output currency of the swap
     #[inline]
-    pub fn output_currency(&self) -> &TOutput {
-        &self.output_amount.currency
+    pub const fn output_currency(&self) -> &TOutput {
+        &self.output_amount.meta.currency
     }
 }
 
@@ -623,7 +625,7 @@ where
         let mut populated_routes: Vec<Swap<TInput, TOutput, TP>> = Vec::with_capacity(routes.len());
         for (amount, route) in routes {
             let trade = Self::from_route(route, amount, trade_type)?;
-            populated_routes.push(trade.swaps[0].clone());
+            populated_routes.push(trade.swaps.into_iter().next().unwrap());
         }
         Self::new(populated_routes, trade_type)
     }
@@ -836,6 +838,7 @@ where
 mod tests {
     use super::*;
     use crate::tests::*;
+    use num_traits::ToPrimitive;
     use once_cell::sync::Lazy;
 
     fn v2_style_pool(

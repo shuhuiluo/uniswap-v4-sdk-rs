@@ -40,4 +40,7 @@ mod tests;
 
 pub mod prelude {
     pub use crate::{abi::*, entities::*, error::*, multicall::*, position_manager::*, utils::*};
+
+    pub use uniswap_sdk_core as sdk_core;
+    pub use uniswap_v3_sdk as v3_sdk;
 }

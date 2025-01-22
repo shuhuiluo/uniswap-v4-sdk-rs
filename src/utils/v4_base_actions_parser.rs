@@ -26,7 +26,7 @@ mod tests {
     use crate::{prelude::*, tests::*};
     use alloy_primitives::{address, uint, Address, U160, U256};
     use once_cell::sync::Lazy;
-    use uniswap_v3_sdk::{constants::FeeAmount, prelude::encode_sqrt_ratio_x96};
+    use uniswap_v3_sdk::prelude::{encode_sqrt_ratio_x96, FeeAmount};
 
     const ADDRESS_ONE: Address = address!("0000000000000000000000000000000000000001");
     const ADDRESS_TWO: Address = address!("0000000000000000000000000000000000000002");

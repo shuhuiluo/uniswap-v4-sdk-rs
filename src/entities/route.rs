@@ -125,7 +125,6 @@ where
 mod tests {
     use super::{Pool, Route};
     use crate::tests::*;
-    use alloy_primitives::address;
     use once_cell::sync::Lazy;
     use uniswap_sdk_core::{prelude::*, token};
     use uniswap_v3_sdk::prelude::*;
