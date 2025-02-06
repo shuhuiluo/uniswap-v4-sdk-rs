@@ -106,6 +106,7 @@ pub const fn has_donate_permissions(address: Address) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::{vec, vec::Vec};
     use alloy_primitives::{address, U160};
     use once_cell::sync::Lazy;
 

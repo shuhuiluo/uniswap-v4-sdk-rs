@@ -1,4 +1,5 @@
 use crate::entities::Pool;
+pub(crate) use alloc::vec;
 use once_cell::sync::Lazy;
 use uniswap_sdk_core::{prelude::*, token};
 use uniswap_v3_sdk::prelude::*;

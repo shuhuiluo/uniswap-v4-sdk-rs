@@ -1,6 +1,5 @@
-//! # uniswap-v4-sdk
-
-#![cfg_attr(not(any(feature = "std", test)), no_std)]
+#![doc = include_str!("../README.md")]
+#![cfg_attr(not(feature = "std"), no_std)]
 #![warn(
     missing_copy_implementations,
     missing_debug_implementations,
