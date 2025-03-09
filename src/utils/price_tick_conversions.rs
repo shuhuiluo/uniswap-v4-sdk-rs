@@ -22,8 +22,8 @@ pub fn tick_to_price(
     tick: I24,
 ) -> Result<Price<Currency, Currency>, Error> {
     let sqrt_ratio_x96 = get_sqrt_ratio_at_tick(tick)?;
-    let ratio_x192 = sqrt_ratio_x96.to_big_uint().pow(2);
-    let q192 = Q192.to_big_uint();
+    let ratio_x192 = sqrt_ratio_x96.to_big_int().pow(2);
+    let q192 = Q192.to_big_int();
     Ok(if sorts_before(&base_currency, &quote_currency)? {
         Price::new(base_currency, quote_currency, q192, ratio_x192)
     } else {
@@ -42,9 +42,9 @@ pub fn price_to_closest_tick(price: &Price<Currency, Currency>) -> Result<I24, E
     const ONE: I24 = I24::from_limbs([1]);
     let sorted = sorts_before(&price.base_currency, &price.quote_currency)?;
     let sqrt_ratio_x96: U160 = if sorted {
-        encode_sqrt_ratio_x96(price.numerator.clone(), price.denominator.clone())
+        encode_sqrt_ratio_x96(price.numerator, price.denominator)
     } else {
-        encode_sqrt_ratio_x96(price.denominator.clone(), price.numerator.clone())
+        encode_sqrt_ratio_x96(price.denominator, price.numerator)
     };
     let tick = sqrt_ratio_x96.get_tick_at_sqrt_ratio()?;
     let next_tick_price = tick_to_price(

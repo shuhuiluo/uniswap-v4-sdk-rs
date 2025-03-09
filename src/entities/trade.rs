@@ -555,6 +555,7 @@ where
     /// * `amount`: The amount specified, either input or output, depending on `trade_type`
     /// * `trade_type`: Whether the trade is an exact input or exact output swap
     #[inline]
+    #[allow(clippy::needless_pass_by_value)]
     pub fn from_route(
         route: Route<TInput, TOutput, TP>,
         amount: CurrencyAmount<impl BaseCurrency>,
@@ -838,6 +839,7 @@ where
 mod tests {
     use super::*;
     use crate::tests::*;
+    use num_integer::Roots;
     use num_traits::ToPrimitive;
     use once_cell::sync::Lazy;
 

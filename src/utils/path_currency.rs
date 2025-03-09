@@ -9,8 +9,8 @@ pub fn amount_with_path_currency<TP: TickDataProvider>(
 ) -> Result<CurrencyAmount<Currency>, Error> {
     Ok(CurrencyAmount::from_fractional_amount(
         get_path_currency(&amount.currency, pool)?,
-        amount.numerator.clone(),
-        amount.denominator.clone(),
+        amount.numerator,
+        amount.denominator,
     )?)
 }
 

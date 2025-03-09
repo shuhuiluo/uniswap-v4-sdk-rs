@@ -215,12 +215,12 @@ impl<TP: TickDataProvider> Pool<TP> {
     /// over currency0
     #[inline]
     pub fn currency0_price(&self) -> Price<Currency, Currency> {
-        let sqrt_price_x96 = self.sqrt_price_x96.to_big_uint();
+        let sqrt_price_x96 = self.sqrt_price_x96.to_big_int();
         Price::new(
             self.currency0.clone(),
             self.currency1.clone(),
             Q192.to_big_int(),
-            &sqrt_price_x96 * &sqrt_price_x96,
+            sqrt_price_x96 * sqrt_price_x96,
         )
     }
 
@@ -233,11 +233,11 @@ impl<TP: TickDataProvider> Pool<TP> {
     /// over currency1
     #[inline]
     pub fn currency1_price(&self) -> Price<Currency, Currency> {
-        let sqrt_price_x96 = self.sqrt_price_x96.to_big_uint();
+        let sqrt_price_x96 = self.sqrt_price_x96.to_big_int();
         Price::new(
             self.currency1.clone(),
             self.currency0.clone(),
-            &sqrt_price_x96 * &sqrt_price_x96,
+            sqrt_price_x96 * sqrt_price_x96,
             Q192.to_big_int(),
         )
     }
