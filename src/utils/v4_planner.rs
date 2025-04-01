@@ -229,6 +229,7 @@ mod tests {
         prelude::{Pool, Route},
         tests::*,
     };
+    use alloy::uint;
     use alloy_primitives::hex;
     use once_cell::sync::Lazy;
 
@@ -237,6 +238,7 @@ mod tests {
             USDC.clone().into(),
             WETH.clone().into(),
             FeeAmount::MEDIUM.into(),
+            uint!(0_U24),
             10,
             Address::ZERO,
             encode_sqrt_ratio_x96(1, 1),
@@ -250,6 +252,7 @@ mod tests {
             USDC.clone().into(),
             DAI.clone().into(),
             FeeAmount::MEDIUM.into(),
+            uint!(0_U24),
             10,
             Address::ZERO,
             encode_sqrt_ratio_x96(1, 1),
@@ -263,6 +266,7 @@ mod tests {
             WETH.clone().into(),
             DAI.clone().into(),
             FeeAmount::MEDIUM.into(),
+            uint!(0_U24),
             10,
             Address::ZERO,
             encode_sqrt_ratio_x96(1, 1),

@@ -37,6 +37,7 @@ mod tests {
             USDC.clone().into(),
             WETH.clone().into(),
             FeeAmount::MEDIUM.into(),
+            uint!(0_U24),
             10,
             Address::ZERO,
             encode_sqrt_ratio_x96(1, 1),

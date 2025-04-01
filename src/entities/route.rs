@@ -125,6 +125,7 @@ where
 mod tests {
     use super::{Pool, Route};
     use crate::tests::*;
+    use alloy::uint;
     use once_cell::sync::Lazy;
     use uniswap_sdk_core::{prelude::*, token};
     use uniswap_v3_sdk::prelude::*;
@@ -140,6 +141,7 @@ mod tests {
             CURRENCY0.clone(),
             CURRENCY1.clone(),
             FeeAmount::MEDIUM.into(),
+            uint!(0_U24),
             10,
             Address::ZERO,
             encode_sqrt_ratio_x96(1, 1),
@@ -152,6 +154,7 @@ mod tests {
             CURRENCY0.clone(),
             ETHER.clone().into(),
             FeeAmount::MEDIUM.into(),
+            uint!(0_U24),
             10,
             Address::ZERO,
             encode_sqrt_ratio_x96(1, 1),
@@ -164,6 +167,7 @@ mod tests {
             CURRENCY1.clone(),
             ETHER.clone().into(),
             FeeAmount::MEDIUM.into(),
+            uint!(0_U24),
             10,
             Address::ZERO,
             encode_sqrt_ratio_x96(1, 1),
@@ -176,6 +180,7 @@ mod tests {
             CURRENCY0.clone(),
             WETH.clone().into(),
             FeeAmount::MEDIUM.into(),
+            uint!(0_U24),
             10,
             Address::ZERO,
             encode_sqrt_ratio_x96(1, 1),
@@ -188,6 +193,7 @@ mod tests {
             ETHER.clone().into(),
             WETH.clone().into(),
             FeeAmount::MEDIUM.into(),
+            uint!(0_U24),
             10,
             Address::ZERO,
             encode_sqrt_ratio_x96(1, 1),
@@ -305,6 +311,10 @@ mod tests {
     }
 
     mod mid_price {
+        use alloy::uint;
+
+        use crate::prelude::Pool;
+
         use super::*;
 
         static POOL_0_1: Lazy<Pool> = Lazy::new(|| {
@@ -312,6 +322,7 @@ mod tests {
                 CURRENCY0.clone(),
                 CURRENCY1.clone(),
                 FeeAmount::MEDIUM.into(),
+                uint!(0_U24),
                 10,
                 Address::ZERO,
                 encode_sqrt_ratio_x96(1, 5),
@@ -324,6 +335,7 @@ mod tests {
                 CURRENCY1.clone(),
                 CURRENCY2.clone(),
                 FeeAmount::MEDIUM.into(),
+                uint!(0_U24),
                 10,
                 Address::ZERO,
                 encode_sqrt_ratio_x96(15, 30),
@@ -336,6 +348,7 @@ mod tests {
                 CURRENCY0.clone(),
                 ETHER.clone().into(),
                 FeeAmount::MEDIUM.into(),
+                uint!(0_U24),
                 10,
                 Address::ZERO,
                 encode_sqrt_ratio_x96(3, 1),
@@ -348,6 +361,7 @@ mod tests {
                 CURRENCY1.clone(),
                 ETHER.clone().into(),
                 FeeAmount::MEDIUM.into(),
+                uint!(0_U24),
                 10,
                 Address::ZERO,
                 encode_sqrt_ratio_x96(1, 7),

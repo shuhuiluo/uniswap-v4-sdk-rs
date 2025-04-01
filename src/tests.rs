@@ -1,5 +1,6 @@
 use crate::entities::Pool;
 pub(crate) use alloc::vec;
+use alloy::uint;
 use once_cell::sync::Lazy;
 use uniswap_sdk_core::{prelude::*, token};
 use uniswap_v3_sdk::prelude::*;
@@ -66,6 +67,7 @@ pub(crate) static USDC_DAI: Lazy<Pool> = Lazy::new(|| {
         USDC.clone().into(),
         DAI.clone().into(),
         FeeAmount::LOWEST.into(),
+        uint!(0_U24),
         10,
         Address::ZERO,
         encode_sqrt_ratio_x96(1, 1),
@@ -78,6 +80,7 @@ pub(crate) static DAI_USDC: Lazy<Pool> = Lazy::new(|| {
         DAI.clone().into(),
         USDC.clone().into(),
         FeeAmount::LOWEST.into(),
+        uint!(0_U24),
         10,
         Address::ZERO,
         encode_sqrt_ratio_x96(1, 1),

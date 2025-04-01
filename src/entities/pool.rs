@@ -1,10 +1,14 @@
 use crate::prelude::{Error, *};
-use alloy_primitives::{aliases::U24, keccak256, uint, Address, ChainId, B256, I256, U160};
+use alloy_primitives::{aliases::U24, keccak256, uint, Address, ChainId, B256, I256, U16, U160};
 use alloy_sol_types::SolValue;
 use uniswap_sdk_core::prelude::*;
 use uniswap_v3_sdk::prelude::*;
 
 pub const DYANMIC_FEE_FLAG: U24 = uint!(0x800000_U24);
+
+const U256_ONE_MILLION: U256 = uint!(1_000_000_U256);
+const U16FFF: U16 = uint!(0xFFF_U16);
+const U24FFFFFF: U24 = uint!(0xFFFFFF_U24);
 
 /// Represents a V4 pool
 #[derive(Clone, Debug)]
@@ -15,6 +19,7 @@ where
     pub currency0: Currency,
     pub currency1: Currency,
     pub fee: U24,
+    pub protocol_fee: U24,
     pub tick_spacing: TP::Index,
     pub sqrt_price_x96: U160,
     pub hooks: Address,
@@ -34,6 +39,7 @@ where
         self.currency0 == other.currency0
             && self.currency1 == other.currency1
             && self.fee == other.fee
+            && self.protocol_fee == other.protocol_fee
             && self.tick_spacing == other.tick_spacing
             && self.sqrt_price_x96 == other.sqrt_price_x96
             && self.hooks == other.hooks
@@ -114,6 +120,7 @@ impl Pool {
         currency_a: Currency,
         currency_b: Currency,
         fee: U24,
+        protocol_fee: U24,
         tick_spacing: <NoTickDataProvider as TickDataProvider>::Index,
         hooks: Address,
         sqrt_price_x96: U160,
@@ -123,6 +130,7 @@ impl Pool {
             currency_a,
             currency_b,
             fee,
+            protocol_fee,
             tick_spacing,
             hooks,
             sqrt_price_x96,
@@ -152,6 +160,7 @@ impl<TP: TickDataProvider> Pool<TP> {
         currency_a: Currency,
         currency_b: Currency,
         fee: U24,
+        protocol_fee: U24,
         tick_spacing: TP::Index,
         hooks: Address,
         sqrt_price_x96: U160,
@@ -175,6 +184,7 @@ impl<TP: TickDataProvider> Pool<TP> {
             currency0,
             currency1,
             fee,
+            protocol_fee,
             tick_spacing,
             sqrt_price_x96,
             hooks,
@@ -290,7 +300,7 @@ impl<TP: TickDataProvider> Pool<TP> {
     ) -> Result<SwapState<TP::Index>, Error> {
         if !self.hook_impacts_swap() {
             Ok(v3_swap(
-                self.fee,
+                calculate_swap_fee_from_pool_protocol_fee(zero_for_one, self.protocol_fee, self.fee),
                 self.sqrt_price_x96,
                 self.tick_current,
                 self.liquidity,
@@ -310,6 +320,33 @@ impl<TP: TickDataProvider> Pool<TP> {
         // know they don't interfere in the swap outcome
         has_swap_permissions(self.hooks)
     }
+}
+
+pub fn calculate_swap_fee_from_pool_protocol_fee(zero_for_one: bool, protocol_fee: U24, lp_fee: U24) -> U24 {
+    calculate_swap_fee(
+        if zero_for_one {
+            get_zero_for_one_protocol_fee(protocol_fee)
+        } else {
+            get_one_for_zero_protocol_fee(protocol_fee)
+        },
+        lp_fee,
+    )
+}
+
+pub fn get_zero_for_one_protocol_fee(protocol_fee: U24) -> U16 {
+    U16::from(protocol_fee.to::<u32>() & 0xfff)
+}
+
+pub fn get_one_for_zero_protocol_fee(protocol_fee: U24) -> U16 {
+    U16::from(protocol_fee.to::<u32>() >> 12)
+}
+
+pub fn calculate_swap_fee(protocol_fee: U16, lp_fee: U24) -> U24 {
+    let protocol_fee = U256::from(protocol_fee & U16FFF);
+    let lp_fee = U256::from(lp_fee & U24FFFFFF);
+    let numerator = protocol_fee * lp_fee;
+    let fee_reduction = numerator / U256_ONE_MILLION;
+    (protocol_fee + lp_fee - fee_reduction).to::<U24>()
 }
 
 impl<TP: Clone + TickDataProvider> Pool<TP> {
@@ -433,10 +470,11 @@ impl<TP: Clone + TickDataProvider> Pool<TP> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::*;
+    use crate::{prelude::Pool, tests::*};
     use alloy_primitives::b256;
 
     mod constructor {
+        use crate::prelude::Pool;
         use super::*;
         use alloy_primitives::address;
 
@@ -447,6 +485,7 @@ mod tests {
                 Currency::Token(USDC.clone()),
                 Currency::Token(WETH9::on_chain(3).unwrap()),
                 FeeAmount::MEDIUM.into(),
+                uint!(0_U24),
                 10,
                 Address::ZERO,
                 encode_sqrt_ratio_x96(1, 1),
@@ -462,6 +501,7 @@ mod tests {
                 Currency::Token(USDC.clone()),
                 Currency::Token(WETH.clone()),
                 uint!(1_000_000_U24),
+                uint!(0_U24),
                 10,
                 Address::ZERO,
                 encode_sqrt_ratio_x96(1, 1),
@@ -476,6 +516,7 @@ mod tests {
                 Currency::Token(USDC.clone()),
                 Currency::Token(WETH.clone()),
                 DYANMIC_FEE_FLAG,
+                uint!(0_U24),
                 10,
                 address!("fff0000000000000000000000000000000000000"),
                 encode_sqrt_ratio_x96(1, 1),
@@ -492,6 +533,7 @@ mod tests {
                 Currency::Token(USDC.clone()),
                 Currency::Token(WETH.clone()),
                 DYANMIC_FEE_FLAG,
+                uint!(0_U24),
                 10,
                 Address::ZERO,
                 encode_sqrt_ratio_x96(1, 1),
@@ -507,6 +549,7 @@ mod tests {
                 Currency::Token(USDC.clone()),
                 Currency::Token(USDC.clone()),
                 FeeAmount::MEDIUM.into(),
+                uint!(0_U24),
                 10,
                 Address::ZERO,
                 encode_sqrt_ratio_x96(1, 1),
@@ -521,6 +564,7 @@ mod tests {
                 Currency::Token(USDC.clone()),
                 Currency::Token(WETH.clone()),
                 FeeAmount::MEDIUM.into(),
+                uint!(0_U24),
                 10,
                 Address::ZERO,
                 encode_sqrt_ratio_x96(1, 1),
@@ -535,6 +579,7 @@ mod tests {
                 Currency::Token(USDC.clone()),
                 Currency::Token(WETH.clone()),
                 FeeAmount::LOWEST.into(),
+                uint!(0_U24),
                 10,
                 Address::ZERO,
                 encode_sqrt_ratio_x96(1, 1),
@@ -549,6 +594,7 @@ mod tests {
                 Currency::Token(USDC.clone()),
                 Currency::Token(WETH.clone()),
                 FeeAmount::HIGH.into(),
+                uint!(0_U24),
                 10,
                 Address::ZERO,
                 encode_sqrt_ratio_x96(1, 1),
@@ -657,6 +703,7 @@ mod tests {
                 Currency::Token(USDC.clone()),
                 Currency::Token(DAI.clone()),
                 FeeAmount::LOWEST.into(),
+                uint!(0_U24),
                 10,
                 Address::ZERO,
                 encode_sqrt_ratio_x96(BigInt::from(101e6 as u128), BigInt::from(100e18 as u128)),
@@ -673,6 +720,7 @@ mod tests {
                 Currency::Token(DAI.clone()),
                 Currency::Token(USDC.clone()),
                 FeeAmount::LOWEST.into(),
+                uint!(0_U24),
                 10,
                 Address::ZERO,
                 encode_sqrt_ratio_x96(BigInt::from(101e6 as u128), BigInt::from(100e18 as u128)),
@@ -693,6 +741,7 @@ mod tests {
                 Currency::Token(USDC.clone()),
                 Currency::Token(DAI.clone()),
                 FeeAmount::LOWEST.into(),
+                uint!(0_U24),
                 10,
                 Address::ZERO,
                 encode_sqrt_ratio_x96(BigInt::from(101e6 as u128), BigInt::from(100e18 as u128)),
@@ -709,6 +758,7 @@ mod tests {
                 Currency::Token(DAI.clone()),
                 Currency::Token(USDC.clone()),
                 FeeAmount::LOWEST.into(),
+                uint!(0_U24),
                 10,
                 Address::ZERO,
                 encode_sqrt_ratio_x96(BigInt::from(101e6 as u128), BigInt::from(100e18 as u128)),
@@ -758,6 +808,8 @@ mod tests {
     }
 
     mod swaps {
+        use crate::prelude::Pool;
+
         use super::*;
         use once_cell::sync::Lazy;
 
@@ -766,6 +818,7 @@ mod tests {
                 Currency::Token(USDC.clone()),
                 Currency::Token(DAI.clone()),
                 FeeAmount::LOWEST.into(),
+                uint!(0_U24),
                 10,
                 Address::ZERO,
                 encode_sqrt_ratio_x96(1, 1),
@@ -815,4 +868,56 @@ mod tests {
             }
         }
     }
+
+    mod protocol_fees {
+        use super::*;
+    
+        use alloy::uint;
+        use alloy_primitives::{aliases::U24, U16};
+    
+        const ONE_HUNDRED_PERCENT_FEE: U24 = uint!(1_000_000_U24);
+        const MAX_PROTOCOL_FEE: U16 = uint!(4000_U16);
+        const U16_1: U16 = uint!(1_U16);
+    
+        #[test]
+        fn test_get_zero_for_one_fee() {
+            let fee: U24 = uint!(16383904_U24);
+            assert_eq!(get_zero_for_one_protocol_fee(fee), MAX_PROTOCOL_FEE);
+        }
+    
+        #[test]
+        fn test_get_one_for_zero_fee() {
+            let fee: U24 = uint!(16383904_U24);
+            assert_eq!(get_one_for_zero_protocol_fee(fee), MAX_PROTOCOL_FEE - U16_1);
+        }
+    
+        #[test]
+        fn test_calculate_swap_fee() {
+            assert_eq!(
+                calculate_swap_fee(MAX_PROTOCOL_FEE, ONE_HUNDRED_PERCENT_FEE),
+                ONE_HUNDRED_PERCENT_FEE,
+            );
+            assert_eq!(
+                calculate_swap_fee(uint!(1000_U16), uint!(3000_U24)),
+                uint!(3997_U24)
+            );
+            assert_eq!(
+                calculate_swap_fee(MAX_PROTOCOL_FEE, uint!(3000_U24)),
+                uint!(6988_U24)
+            );
+            assert_eq!(
+                calculate_swap_fee(MAX_PROTOCOL_FEE, uint!(0_U24)),
+                MAX_PROTOCOL_FEE.to()
+            );
+            assert_eq!(
+                calculate_swap_fee(uint!(0_U16), uint!(0_U24)),
+                uint!(0_U24)
+            );
+            assert_eq!(
+                calculate_swap_fee(uint!(0_U16), uint!(1000_U24)),
+                uint!(1000_U24)
+            );
+        }
+    }
+    
 }

@@ -838,7 +838,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::*;
+    use crate::{prelude::Pool, tests::*};
+    use alloy::uint;
     use num_integer::Roots;
     use num_traits::ToPrimitive;
     use once_cell::sync::Lazy;
@@ -859,6 +860,7 @@ mod tests {
             reserve0.meta.currency,
             reserve1.meta.currency,
             fee_amount.into(),
+            uint!(0_U24),
             tick_spacing,
             Address::ZERO,
             sqrt_ratio_x96,

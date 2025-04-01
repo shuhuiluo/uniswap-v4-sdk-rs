@@ -66,7 +66,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::*;
+    use crate::{prelude::Pool, tests::*};
     use alloy_primitives::{aliases::I24, uint};
     use once_cell::sync::Lazy;
     use uniswap_sdk_core::token;
@@ -82,6 +82,7 @@ mod tests {
             ETHER.clone().into(),
             CURRENCY1.clone().into(),
             FeeAmount::MEDIUM.into(),
+            uint!(0_U24),
             10,
             Address::ZERO,
             encode_sqrt_ratio_x96(1, 1),
@@ -94,6 +95,7 @@ mod tests {
             CURRENCY1.clone().into(),
             CURRENCY2.clone().into(),
             FeeAmount::MEDIUM.into(),
+            uint!(0_U24),
             10,
             Address::ZERO,
             encode_sqrt_ratio_x96(1, 1),
@@ -106,6 +108,7 @@ mod tests {
             CURRENCY2.clone().into(),
             CURRENCY3.clone().into(),
             FeeAmount::MEDIUM.into(),
+            uint!(0_U24),
             10,
             Address::ZERO,
             encode_sqrt_ratio_x96(1, 1),

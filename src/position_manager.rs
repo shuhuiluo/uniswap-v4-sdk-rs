@@ -302,6 +302,7 @@ pub fn remove_call_parameters<TP: TickDataProvider>(
                 position.pool.currency0.clone(),
                 position.pool.currency1.clone(),
                 position.pool.fee,
+                position.pool.protocol_fee,
                 position.pool.tick_spacing.to_i24().as_i32(),
                 position.pool.hooks,
                 position.pool.sqrt_price_x96,
