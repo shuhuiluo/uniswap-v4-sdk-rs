@@ -123,6 +123,8 @@ macro_rules! create_route {
 #[macro_export]
 macro_rules! trade_from_route {
     ($route:expr, $amount:expr, $trade_type:expr) => {
-        $crate::entities::Trade::from_route($route.clone(), $amount.clone(), $trade_type).unwrap()
+        $crate::entities::Trade::from_route($route.clone(), $amount.clone(), $trade_type)
+            .await
+            .unwrap()
     };
 }

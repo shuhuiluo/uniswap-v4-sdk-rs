@@ -1,5 +1,5 @@
 use crate::prelude::{amount_with_path_currency, Error, Pool, Route};
-use alloc::vec;
+use alloc::{boxed::Box, vec};
 use alloy_primitives::map::HashSet;
 use core::cmp::Ordering;
 use uniswap_sdk_core::prelude::*;
@@ -526,11 +526,11 @@ where
     /// * `route`: The route of the exact in trade
     /// * `amount_in`: The amount being passed in
     #[inline]
-    pub fn exact_in(
+    pub async fn exact_in(
         route: Route<TInput, TOutput, TP>,
         amount_in: CurrencyAmount<impl BaseCurrency>,
     ) -> Result<Self, Error> {
-        Self::from_route(route, amount_in, TradeType::ExactInput)
+        Self::from_route(route, amount_in, TradeType::ExactInput).await
     }
 
     /// Constructs an exact out trade with the given amount out and route
@@ -540,11 +540,11 @@ where
     /// * `route`: The route of the exact out trade
     /// * `amount_out`: The amount returned by the trade
     #[inline]
-    pub fn exact_out(
+    pub async fn exact_out(
         route: Route<TInput, TOutput, TP>,
         amount_out: CurrencyAmount<impl BaseCurrency>,
     ) -> Result<Self, Error> {
-        Self::from_route(route, amount_out, TradeType::ExactOutput)
+        Self::from_route(route, amount_out, TradeType::ExactOutput).await
     }
 
     /// Constructs a trade by simulating swaps through the given route
@@ -556,7 +556,7 @@ where
     /// * `trade_type`: Whether the trade is an exact input or exact output swap
     #[inline]
     #[allow(clippy::needless_pass_by_value)]
-    pub fn from_route(
+    pub async fn from_route(
         route: Route<TInput, TOutput, TP>,
         amount: CurrencyAmount<impl BaseCurrency>,
         trade_type: TradeType,
@@ -569,7 +569,7 @@ where
                 // Account for trades that wrap/unwrap as a first step
                 let mut token_amount = amount_with_path_currency(&amount, &route.pools[0])?;
                 for pool in &route.pools {
-                    (token_amount, _) = pool.get_output_amount(&token_amount, None)?;
+                    (token_amount, _) = pool.get_output_amount(&token_amount, None).await?;
                 }
                 output_amount = CurrencyAmount::from_fractional_amount(
                     route.output.clone(),
@@ -588,7 +588,7 @@ where
                 let mut token_amount =
                     amount_with_path_currency(&amount, route.pools.last().unwrap())?;
                 for pool in route.pools.iter().rev() {
-                    (token_amount, _) = pool.get_input_amount(&token_amount, None)?;
+                    (token_amount, _) = pool.get_input_amount(&token_amount, None).await?;
                 }
                 input_amount = CurrencyAmount::from_fractional_amount(
                     route.input.clone(),
@@ -616,7 +616,7 @@ where
     ///   each
     /// * `trade_type`: Whether the trade is an exact input or exact output swap
     #[inline]
-    pub fn from_routes(
+    pub async fn from_routes(
         routes: Vec<(
             CurrencyAmount<impl BaseCurrency>,
             Route<TInput, TOutput, TP>,
@@ -625,7 +625,7 @@ where
     ) -> Result<Self, Error> {
         let mut populated_routes: Vec<Swap<TInput, TOutput, TP>> = Vec::with_capacity(routes.len());
         for (amount, route) in routes {
-            let trade = Self::from_route(route, amount, trade_type)?;
+            let trade = Self::from_route(route, amount, trade_type).await?;
             populated_routes.push(trade.swaps.into_iter().next().unwrap());
         }
         Self::new(populated_routes, trade_type)
@@ -652,7 +652,7 @@ where
     /// * `best_trades`: Used in recursion; the current list of best trades
     #[inline]
     #[allow(clippy::needless_pass_by_value)]
-    pub fn best_trade_exact_in<'a>(
+    pub async fn best_trade_exact_in<'a>(
         pools: Vec<Pool<TP>>,
         currency_amount_in: &'a CurrencyAmount<TInput>,
         currency_out: &'a TOutput,
@@ -684,8 +684,8 @@ where
                 }
             }
             let amount_out = match next_amount_in {
-                Some(amount_in) => pool.get_output_amount(amount_in, None),
-                None => pool.get_output_amount(currency_amount_in, None),
+                Some(amount_in) => pool.get_output_amount(amount_in, None).await,
+                None => pool.get_output_amount(currency_amount_in, None).await,
             };
             let amount_out = match amount_out {
                 Ok((amount_out, _)) => amount_out,
@@ -704,7 +704,8 @@ where
                     )?,
                     currency_amount_in.clone(),
                     TradeType::ExactInput,
-                )?;
+                )
+                .await?;
                 sorted_insert(best_trades, trade, max_num_results, trade_comparator);
             } else if max_hops > 1 && pools.len() > 1 {
                 let pools_excluding_this_pool = pools[..i]
@@ -716,7 +717,7 @@ where
                 // have not exceeded maxHops
                 let mut next_pools = current_pools.clone();
                 next_pools.push(pool.clone());
-                Self::best_trade_exact_in(
+                Box::pin(Self::best_trade_exact_in(
                     pools_excluding_this_pool,
                     currency_amount_in,
                     currency_out,
@@ -727,7 +728,8 @@ where
                     next_pools,
                     Some(&amount_out),
                     best_trades,
-                )?;
+                ))
+                .await?;
             }
         }
         Ok(best_trades)
@@ -753,7 +755,7 @@ where
     /// * `best_trades`: Used in recursion; the current list of best trades
     #[inline]
     #[allow(clippy::needless_pass_by_value)]
-    pub fn best_trade_exact_out<'a>(
+    pub async fn best_trade_exact_out<'a>(
         pools: Vec<Pool<TP>>,
         currency_in: &'a TInput,
         currency_amount_out: &'a CurrencyAmount<TOutput>,
@@ -785,8 +787,8 @@ where
                 }
             }
             let amount_in = match next_amount_out {
-                Some(amount_out) => pool.get_input_amount(amount_out, None),
-                None => pool.get_input_amount(currency_amount_out, None),
+                Some(amount_out) => pool.get_input_amount(amount_out, None).await,
+                None => pool.get_input_amount(currency_amount_out, None).await,
             };
             let amount_in = match amount_in {
                 Ok((amount_in, _)) => amount_in,
@@ -805,7 +807,8 @@ where
                     )?,
                     currency_amount_out.clone(),
                     TradeType::ExactOutput,
-                )?;
+                )
+                .await?;
                 sorted_insert(best_trades, trade, max_num_results, trade_comparator);
             } else if max_hops > 1 && pools.len() > 1 {
                 let pools_excluding_this_pool = pools[..i]
@@ -817,7 +820,7 @@ where
                 // have not exceeded maxHops
                 let mut next_pools = vec![pool.clone()];
                 next_pools.extend(current_pools.clone());
-                Self::best_trade_exact_out(
+                Box::pin(Self::best_trade_exact_out(
                     pools_excluding_this_pool,
                     currency_in,
                     currency_amount_out,
@@ -828,7 +831,8 @@ where
                     next_pools,
                     Some(&amount_in),
                     best_trades,
-                )?;
+                ))
+                .await?;
             }
         }
         Ok(best_trades)
@@ -949,8 +953,8 @@ mod tests {
     mod from_route {
         use super::*;
 
-        #[test]
-        fn can_be_constructed_with_ether_as_input() {
+        #[tokio::test]
+        async fn can_be_constructed_with_ether_as_input() {
             let trade = trade_from_route!(
                 create_route!(POOL_ETH_0, ETHER, TOKEN0),
                 currency_amount!(ETHER, 10000),
@@ -960,8 +964,8 @@ mod tests {
             assert_eq!(trade.output_currency().clone(), TOKEN0.clone());
         }
 
-        #[test]
-        fn can_be_constructed_with_ether_as_input_on_a_weth_pool() {
+        #[tokio::test]
+        async fn can_be_constructed_with_ether_as_input_on_a_weth_pool() {
             let trade = trade_from_route!(
                 create_route!(POOL_WETH_0, ETHER, TOKEN0),
                 currency_amount!(ETHER, 10000),
@@ -971,8 +975,8 @@ mod tests {
             assert_eq!(trade.output_currency().clone(), TOKEN0.clone());
         }
 
-        #[test]
-        fn can_be_constructed_with_weth_as_input_on_a_eth_pool() {
+        #[tokio::test]
+        async fn can_be_constructed_with_weth_as_input_on_a_eth_pool() {
             let trade = trade_from_route!(
                 create_route!(POOL_ETH_0, WETH, TOKEN0),
                 currency_amount!(WETH, 10000),
@@ -982,8 +986,8 @@ mod tests {
             assert_eq!(trade.output_currency().clone(), TOKEN0.clone());
         }
 
-        #[test]
-        fn can_be_constructed_with_ether_as_output_on_a_weth_pool() {
+        #[tokio::test]
+        async fn can_be_constructed_with_ether_as_output_on_a_weth_pool() {
             let trade = trade_from_route!(
                 create_route!(POOL_WETH_0, TOKEN0, ETHER),
                 currency_amount!(TOKEN0, 10000),
@@ -993,8 +997,8 @@ mod tests {
             assert_eq!(trade.output_currency().clone(), ETHER.clone());
         }
 
-        #[test]
-        fn can_be_constructed_with_weth_as_output_on_a_eth_pool() {
+        #[tokio::test]
+        async fn can_be_constructed_with_weth_as_output_on_a_eth_pool() {
             let trade = trade_from_route!(
                 create_route!(POOL_ETH_0, TOKEN0, WETH),
                 currency_amount!(TOKEN0, 10000),
@@ -1004,8 +1008,8 @@ mod tests {
             assert_eq!(trade.output_currency().clone(), WETH.clone());
         }
 
-        #[test]
-        fn can_be_constructed_with_ether_as_input_for_exact_output() {
+        #[tokio::test]
+        async fn can_be_constructed_with_ether_as_input_for_exact_output() {
             let trade = trade_from_route!(
                 create_route!(POOL_ETH_0, ETHER, TOKEN0),
                 currency_amount!(TOKEN0, 10000),
@@ -1015,8 +1019,8 @@ mod tests {
             assert_eq!(trade.output_currency().clone(), TOKEN0.clone());
         }
 
-        #[test]
-        fn can_be_constructed_with_ether_as_output() {
+        #[tokio::test]
+        async fn can_be_constructed_with_ether_as_output() {
             let trade = trade_from_route!(
                 create_route!(POOL_ETH_0, TOKEN0, ETHER),
                 currency_amount!(ETHER, 10000),
@@ -1026,8 +1030,8 @@ mod tests {
             assert_eq!(trade.output_currency().clone(), ETHER.clone());
         }
 
-        #[test]
-        fn can_be_constructed_with_ether_as_output_for_exact_input() {
+        #[tokio::test]
+        async fn can_be_constructed_with_ether_as_output_for_exact_input() {
             let trade = trade_from_route!(
                 create_route!(POOL_ETH_0, TOKEN0, ETHER),
                 currency_amount!(TOKEN0, 10000),
@@ -1041,8 +1045,8 @@ mod tests {
     mod from_routes {
         use super::*;
 
-        #[test]
-        fn can_be_constructed_with_ether_as_input_with_multiple_routes() {
+        #[tokio::test]
+        async fn can_be_constructed_with_ether_as_input_with_multiple_routes() {
             let trade = Trade::from_routes(
                 vec![(
                     currency_amount!(ETHER, 10000),
@@ -1050,13 +1054,14 @@ mod tests {
                 )],
                 TradeType::ExactInput,
             )
+            .await
             .unwrap();
             assert_eq!(trade.input_currency().clone(), ETHER.clone());
             assert_eq!(trade.output_currency().clone(), TOKEN0.clone());
         }
 
-        #[test]
-        fn can_be_constructed_with_ether_as_input_for_exact_output_with_multiple_routes() {
+        #[tokio::test]
+        async fn can_be_constructed_with_ether_as_input_for_exact_output_with_multiple_routes() {
             let trade = Trade::from_routes(
                 vec![
                     (
@@ -1070,13 +1075,14 @@ mod tests {
                 ],
                 TradeType::ExactOutput,
             )
+            .await
             .unwrap();
             assert_eq!(trade.input_currency().clone(), ETHER.clone());
             assert_eq!(trade.output_currency().clone(), TOKEN0.clone());
         }
 
-        #[test]
-        fn can_be_constructed_with_ether_as_output_with_multiple_routes() {
+        #[tokio::test]
+        async fn can_be_constructed_with_ether_as_output_with_multiple_routes() {
             let trade = Trade::from_routes(
                 vec![
                     (
@@ -1090,13 +1096,14 @@ mod tests {
                 ],
                 TradeType::ExactOutput,
             )
+            .await
             .unwrap();
             assert_eq!(trade.input_currency().clone(), TOKEN0.clone());
             assert_eq!(trade.output_currency().clone(), ETHER.clone());
         }
 
-        #[test]
-        fn can_be_constructed_with_ether_as_output_for_exact_input_with_multiple_routes() {
+        #[tokio::test]
+        async fn can_be_constructed_with_ether_as_output_for_exact_input_with_multiple_routes() {
             let trade = Trade::from_routes(
                 vec![
                     (
@@ -1110,14 +1117,15 @@ mod tests {
                 ],
                 TradeType::ExactInput,
             )
+            .await
             .unwrap();
             assert_eq!(trade.input_currency().clone(), TOKEN0.clone());
             assert_eq!(trade.output_currency().clone(), ETHER.clone());
         }
 
-        #[test]
+        #[tokio::test]
         #[should_panic(expected = "POOLS_DUPLICATED")]
-        fn throws_if_pools_are_reused_between_routes() {
+        async fn throws_if_pools_are_reused_between_routes() {
             let _ = Trade::from_routes(
                 vec![
                     (
@@ -1130,7 +1138,9 @@ mod tests {
                     ),
                 ],
                 TradeType::ExactInput,
-            );
+            )
+            .await
+            .unwrap();
         }
     }
 
