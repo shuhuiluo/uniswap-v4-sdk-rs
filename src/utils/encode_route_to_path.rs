@@ -66,7 +66,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::*;
+    use crate::{create_route, tests::*};
     use alloy_primitives::{aliases::I24, uint};
     use once_cell::sync::Lazy;
     use uniswap_sdk_core::token;
@@ -113,14 +113,9 @@ mod tests {
         )
         .unwrap()
     });
-    static ROUTE: Lazy<Route<Ether, Currency, NoTickDataProvider>> = Lazy::new(|| {
-        Route::new(
-            vec![POOL_ETH_1.clone(), POOL_1_2.clone(), POOL_2_3.clone()],
-            ETHER.clone(),
-            CURRENCY3.clone().into(),
-        )
-        .unwrap()
-    });
+    static ROUTE: Lazy<Route<Ether, Currency, NoTickDataProvider>> = Lazy::new(
+        || create_route!(POOL_ETH_1, POOL_1_2, POOL_2_3; ETHER, Currency::from(CURRENCY3.clone())),
+    );
 
     #[test]
     fn test_encodes_correct_route_for_exact_in() {
@@ -182,12 +177,7 @@ mod tests {
 
     #[test]
     fn test_encodes_correct_path_when_route_has_different_output_than_route_path_output() {
-        let new_route = Route::new(
-            vec![POOL_1_2.clone(), POOL_ETH_1.clone()],
-            CURRENCY2.clone(),
-            WETH.clone(),
-        )
-        .unwrap();
+        let new_route = create_route!(POOL_1_2, POOL_ETH_1; CURRENCY2, WETH);
         let exact_output = true;
         let expected = vec![
             PathKey {
@@ -211,12 +201,7 @@ mod tests {
 
     #[test]
     fn test_encodes_correct_path_when_route_has_different_input_than_route_path_input() {
-        let new_route = Route::new(
-            vec![POOL_ETH_1.clone(), POOL_1_2.clone()],
-            WETH.clone(),
-            CURRENCY2.clone(),
-        )
-        .unwrap();
+        let new_route = create_route!(POOL_ETH_1, POOL_1_2; WETH, CURRENCY2);
         let exact_output = false;
         let expected = vec![
             PathKey {

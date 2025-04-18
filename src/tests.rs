@@ -109,3 +109,13 @@ macro_rules! currency_amount {
         CurrencyAmount::from_raw_amount($currency.clone(), $amount).unwrap()
     };
 }
+
+#[macro_export]
+macro_rules! create_route {
+    ($pool:expr, $token_in:expr, $token_out:expr) => {
+        $crate::entities::Route::new(vec![$pool.clone()], $token_in.clone(), $token_out.clone()).unwrap()
+    };
+    ($($pool:expr),+; $token_in:expr, $token_out:expr) => {
+        $crate::entities::Route::new(vec![$($pool.clone()),+], $token_in.clone(), $token_out.clone()).unwrap()
+    };
+}

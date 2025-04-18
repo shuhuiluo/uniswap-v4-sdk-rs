@@ -23,7 +23,7 @@ pub fn parse_calldata(calldata: &Bytes) -> Result<V4RouterCall, Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{prelude::*, tests::*};
+    use crate::{create_route, prelude::*, tests::*};
     use alloy_primitives::{address, uint, Address, U256};
     use once_cell::sync::Lazy;
     use uniswap_v3_sdk::prelude::{encode_sqrt_ratio_x96, FeeAmount};
@@ -99,29 +99,13 @@ mod tests {
             }),
             Actions::SWAP_EXACT_IN(SwapExactInParams {
                 currencyIn: DAI.address,
-                path: encode_route_to_path(
-                    &Route::new(
-                        vec![DAI_USDC.clone(), USDC_WETH.clone()],
-                        DAI.clone(),
-                        WETH.clone(),
-                    )
-                    .unwrap(),
-                    false,
-                ),
+                path: encode_route_to_path(&create_route!(DAI_USDC, USDC_WETH; DAI, WETH), false),
                 amountIn: AMOUNT.try_into().unwrap(),
                 amountOutMinimum: AMOUNT.try_into().unwrap(),
             }),
             Actions::SWAP_EXACT_OUT(SwapExactOutParams {
                 currencyOut: DAI.address,
-                path: encode_route_to_path(
-                    &Route::new(
-                        vec![DAI_USDC.clone(), USDC_WETH.clone()],
-                        DAI.clone(),
-                        WETH.clone(),
-                    )
-                    .unwrap(),
-                    false,
-                ),
+                path: encode_route_to_path(&create_route!(DAI_USDC, USDC_WETH; DAI, WETH), false),
                 amountOut: AMOUNT.try_into().unwrap(),
                 amountInMaximum: AMOUNT.try_into().unwrap(),
             }),
