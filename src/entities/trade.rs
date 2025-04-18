@@ -838,7 +838,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{create_route, currency_amount, tests::*};
+    use crate::{create_route, currency_amount, tests::*, trade_from_route};
     use num_integer::Roots;
     use num_traits::ToPrimitive;
     use once_cell::sync::Lazy;
@@ -951,96 +951,88 @@ mod tests {
 
         #[test]
         fn can_be_constructed_with_ether_as_input() {
-            let trade = Trade::from_route(
+            let trade = trade_from_route!(
                 create_route!(POOL_ETH_0, ETHER, TOKEN0),
                 currency_amount!(ETHER, 10000),
-                TradeType::ExactInput,
-            )
-            .unwrap();
+                TradeType::ExactInput
+            );
             assert_eq!(trade.input_currency().clone(), ETHER.clone());
             assert_eq!(trade.output_currency().clone(), TOKEN0.clone());
         }
 
         #[test]
         fn can_be_constructed_with_ether_as_input_on_a_weth_pool() {
-            let trade = Trade::from_route(
+            let trade = trade_from_route!(
                 create_route!(POOL_WETH_0, ETHER, TOKEN0),
                 currency_amount!(ETHER, 10000),
-                TradeType::ExactInput,
-            )
-            .unwrap();
+                TradeType::ExactInput
+            );
             assert_eq!(trade.input_currency().clone(), ETHER.clone());
             assert_eq!(trade.output_currency().clone(), TOKEN0.clone());
         }
 
         #[test]
         fn can_be_constructed_with_weth_as_input_on_a_eth_pool() {
-            let trade = Trade::from_route(
+            let trade = trade_from_route!(
                 create_route!(POOL_ETH_0, WETH, TOKEN0),
                 currency_amount!(WETH, 10000),
-                TradeType::ExactInput,
-            )
-            .unwrap();
+                TradeType::ExactInput
+            );
             assert_eq!(trade.input_currency().clone(), WETH.clone());
             assert_eq!(trade.output_currency().clone(), TOKEN0.clone());
         }
 
         #[test]
         fn can_be_constructed_with_ether_as_output_on_a_weth_pool() {
-            let trade = Trade::from_route(
+            let trade = trade_from_route!(
                 create_route!(POOL_WETH_0, TOKEN0, ETHER),
                 currency_amount!(TOKEN0, 10000),
-                TradeType::ExactInput,
-            )
-            .unwrap();
+                TradeType::ExactInput
+            );
             assert_eq!(trade.input_currency().clone(), TOKEN0.clone());
             assert_eq!(trade.output_currency().clone(), ETHER.clone());
         }
 
         #[test]
         fn can_be_constructed_with_weth_as_output_on_a_eth_pool() {
-            let trade = Trade::from_route(
+            let trade = trade_from_route!(
                 create_route!(POOL_ETH_0, TOKEN0, WETH),
                 currency_amount!(TOKEN0, 10000),
-                TradeType::ExactInput,
-            )
-            .unwrap();
+                TradeType::ExactInput
+            );
             assert_eq!(trade.input_currency().clone(), TOKEN0.clone());
             assert_eq!(trade.output_currency().clone(), WETH.clone());
         }
 
         #[test]
         fn can_be_constructed_with_ether_as_input_for_exact_output() {
-            let trade = Trade::from_route(
+            let trade = trade_from_route!(
                 create_route!(POOL_ETH_0, ETHER, TOKEN0),
                 currency_amount!(TOKEN0, 10000),
-                TradeType::ExactOutput,
-            )
-            .unwrap();
+                TradeType::ExactOutput
+            );
             assert_eq!(trade.input_currency().clone(), ETHER.clone());
             assert_eq!(trade.output_currency().clone(), TOKEN0.clone());
         }
 
         #[test]
         fn can_be_constructed_with_ether_as_output() {
-            let trade = Trade::from_route(
+            let trade = trade_from_route!(
                 create_route!(POOL_ETH_0, TOKEN0, ETHER),
                 currency_amount!(ETHER, 10000),
-                TradeType::ExactOutput,
-            )
-            .unwrap();
+                TradeType::ExactOutput
+            );
             assert_eq!(trade.input_currency().clone(), TOKEN0.clone());
             assert_eq!(trade.output_currency().clone(), ETHER.clone());
         }
 
         #[test]
         fn can_be_constructed_with_ether_as_output_for_exact_input() {
-            let trade = Trade::from_route(
+            let trade = trade_from_route!(
                 create_route!(POOL_ETH_0, TOKEN0, ETHER),
                 currency_amount!(TOKEN0, 10000),
-                TradeType::ExactInput,
-            )
-            .unwrap();
+                TradeType::ExactInput
+            );
             assert_eq!(trade.input_currency().clone(), TOKEN0.clone());
             assert_eq!(trade.output_currency().clone(), ETHER.clone());
         }

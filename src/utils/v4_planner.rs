@@ -342,7 +342,7 @@ mod tests {
 
     mod add_trade {
         use super::*;
-        use crate::create_route;
+        use crate::{create_route, trade_from_route};
 
         #[test]
         fn completes_v4_exact_in_2_hop_swap_same_results_as_add_action() {
@@ -358,12 +358,11 @@ mod tests {
             }));
 
             // encode with addTrade function
-            let trade = Trade::from_route(
+            let trade = trade_from_route!(
                 route,
                 currency_amount!(DAI, ONE_ETHER),
-                TradeType::ExactInput,
-            )
-            .unwrap();
+                TradeType::ExactInput
+            );
             let mut trade_planner = V4Planner::default();
             trade_planner.add_trade(&trade, None).unwrap();
 
@@ -380,12 +379,11 @@ mod tests {
         fn completes_v4_exact_out_2_hop_swap() {
             let route = create_route!(DAI_USDC, USDC_WETH; DAI, WETH);
             let slippage_tolerance = Percent::new(5, 100);
-            let trade = Trade::from_route(
+            let trade = trade_from_route!(
                 route,
                 currency_amount!(WETH, ONE_ETHER),
-                TradeType::ExactOutput,
-            )
-            .unwrap();
+                TradeType::ExactOutput
+            );
             let mut planner = V4Planner::default();
             planner.add_trade(&trade, Some(slippage_tolerance)).unwrap();
 
@@ -400,12 +398,11 @@ mod tests {
         fn completes_v4_exact_out_2_hop_swap_route_path_output_different_than_route_output() {
             let route = create_route!(DAI_USDC, USDC_WETH; DAI, ETHER);
             let slippage_tolerance = Percent::new(5, 100);
-            let trade = Trade::from_route(
+            let trade = trade_from_route!(
                 route,
                 currency_amount!(ETHER, ONE_ETHER),
-                TradeType::ExactOutput,
-            )
-            .unwrap();
+                TradeType::ExactOutput
+            );
             let mut planner = V4Planner::default();
             planner.add_trade(&trade, Some(slippage_tolerance)).unwrap();
 
@@ -420,12 +417,11 @@ mod tests {
         fn completes_v4_exact_in_2_hop_swap_route_path_input_different_than_route_input() {
             let route = create_route!(USDC_WETH, DAI_USDC; ETHER, DAI);
             let slippage_tolerance = Percent::new(5, 100);
-            let trade = Trade::from_route(
+            let trade = trade_from_route!(
                 route,
                 currency_amount!(ETHER, ONE_ETHER),
-                TradeType::ExactInput,
-            )
-            .unwrap();
+                TradeType::ExactInput
+            );
             let mut planner = V4Planner::default();
             planner.add_trade(&trade, Some(slippage_tolerance)).unwrap();
 
@@ -440,12 +436,11 @@ mod tests {
         #[should_panic(expected = "ExactOut requires slippageTolerance")]
         fn throws_error_if_adding_exact_out_trade_without_slippage_tolerance() {
             let route = create_route!(DAI_USDC, USDC_WETH; DAI, WETH);
-            let trade = Trade::from_route(
+            let trade = trade_from_route!(
                 route,
                 currency_amount!(WETH, ONE_ETHER),
-                TradeType::ExactOutput,
-            )
-            .unwrap();
+                TradeType::ExactOutput
+            );
             V4Planner::default().add_trade(&trade, None).unwrap();
         }
 

@@ -119,3 +119,10 @@ macro_rules! create_route {
         $crate::entities::Route::new(vec![$($pool.clone()),+], $token_in.clone(), $token_out.clone()).unwrap()
     };
 }
+
+#[macro_export]
+macro_rules! trade_from_route {
+    ($route:expr, $amount:expr, $trade_type:expr) => {
+        $crate::entities::Trade::from_route($route.clone(), $amount.clone(), $trade_type).unwrap()
+    };
+}
