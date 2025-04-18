@@ -2,6 +2,7 @@
 name = "uniswap-v4-sdk"
 version = "0.4.0"
 edition = "2021"
+rust-version = "1.83"
 authors = ["Shuhui Luo <twitter.com/aureliano_law>"]
 description = "Uniswap V4 SDK for Rust"
 license = "MIT"

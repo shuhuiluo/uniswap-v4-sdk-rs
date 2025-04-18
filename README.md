@@ -16,6 +16,17 @@ It is feature-complete but missing unit tests.
 - Consistent API and types with the [V3 SDK](https://github.com/shuhuiluo/uniswap-v3-sdk-rs)
   and [SDK Core](https://github.com/malik672/uniswap-sdk-core-rust)
 
+## Supported Rust Versions (MSRV)
+
+<!--
+When updating this, also update:
+- clippy.toml
+- Cargo.toml
+- .github/workflows/ci.yml
+-->
+
+The current MSRV (minimum supported rust version) is 1.83.
+
 ## Note on `no_std`
 
 By default, this library does not depend on the standard library (`std`). However, the `std` feature can be enabled.
