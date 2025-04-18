@@ -433,7 +433,7 @@ impl<TP: Clone + TickDataProvider> Pool<TP> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::*;
+    use crate::{currency_amount, tests::*};
     use alloy_primitives::b256;
 
     mod constructor {
@@ -780,7 +780,7 @@ mod tests {
 
             #[test]
             fn usdc_to_dai() {
-                let input_amount = CurrencyAmount::from_raw_amount(USDC.clone(), 100).unwrap();
+                let input_amount = currency_amount!(USDC, 100);
                 let (output_amount, _) = POOL.get_output_amount(&input_amount, None).unwrap();
                 assert!(output_amount.currency.equals(&DAI.clone()));
                 assert_eq!(output_amount.quotient(), 98.into());
@@ -788,7 +788,7 @@ mod tests {
 
             #[test]
             fn dai_to_usdc() {
-                let input_amount = CurrencyAmount::from_raw_amount(DAI.clone(), 100).unwrap();
+                let input_amount = currency_amount!(DAI, 100);
                 let (output_amount, _) = POOL.get_output_amount(&input_amount, None).unwrap();
                 assert!(output_amount.currency.equals(&USDC.clone()));
                 assert_eq!(output_amount.quotient(), 98.into());
@@ -800,7 +800,7 @@ mod tests {
 
             #[test]
             fn usdc_to_dai() {
-                let output_amount = CurrencyAmount::from_raw_amount(DAI.clone(), 98).unwrap();
+                let output_amount = currency_amount!(DAI, 98);
                 let (input_amount, _) = POOL.get_input_amount(&output_amount, None).unwrap();
                 assert!(input_amount.currency.equals(&USDC.clone()));
                 assert_eq!(input_amount.quotient(), 100.into());
@@ -808,7 +808,7 @@ mod tests {
 
             #[test]
             fn dai_to_usdc() {
-                let output_amount = CurrencyAmount::from_raw_amount(USDC.clone(), 98).unwrap();
+                let output_amount = currency_amount!(USDC, 98);
                 let (input_amount, _) = POOL.get_input_amount(&output_amount, None).unwrap();
                 assert!(input_amount.currency.equals(&DAI.clone()));
                 assert_eq!(input_amount.quotient(), 100.into());

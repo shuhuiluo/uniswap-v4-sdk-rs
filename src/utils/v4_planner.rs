@@ -226,6 +226,7 @@ fn currency_address(currency: &impl BaseCurrency) -> Address {
 mod tests {
     use super::*;
     use crate::{
+        currency_amount,
         prelude::{Pool, Route},
         tests::*,
     };
@@ -367,7 +368,7 @@ mod tests {
             // encode with addTrade function
             let trade = Trade::from_route(
                 route,
-                CurrencyAmount::from_raw_amount(DAI.clone(), ONE_ETHER).unwrap(),
+                currency_amount!(DAI, ONE_ETHER),
                 TradeType::ExactInput,
             )
             .unwrap();
@@ -394,7 +395,7 @@ mod tests {
             let slippage_tolerance = Percent::new(5, 100);
             let trade = Trade::from_route(
                 route,
-                CurrencyAmount::from_raw_amount(WETH.clone(), ONE_ETHER).unwrap(),
+                currency_amount!(WETH, ONE_ETHER),
                 TradeType::ExactOutput,
             )
             .unwrap();
@@ -419,7 +420,7 @@ mod tests {
             let slippage_tolerance = Percent::new(5, 100);
             let trade = Trade::from_route(
                 route,
-                CurrencyAmount::from_raw_amount(ETHER.clone(), ONE_ETHER).unwrap(),
+                currency_amount!(ETHER, ONE_ETHER),
                 TradeType::ExactOutput,
             )
             .unwrap();
@@ -444,7 +445,7 @@ mod tests {
             let slippage_tolerance = Percent::new(5, 100);
             let trade = Trade::from_route(
                 route,
-                CurrencyAmount::from_raw_amount(ETHER.clone(), ONE_ETHER).unwrap(),
+                currency_amount!(ETHER, ONE_ETHER),
                 TradeType::ExactInput,
             )
             .unwrap();
@@ -469,7 +470,7 @@ mod tests {
             .unwrap();
             let trade = Trade::from_route(
                 route,
-                CurrencyAmount::from_raw_amount(WETH.clone(), ONE_ETHER).unwrap(),
+                currency_amount!(WETH, ONE_ETHER),
                 TradeType::ExactOutput,
             )
             .unwrap();
@@ -482,7 +483,7 @@ mod tests {
         )]
         fn throws_error_if_adding_multiple_swaps_trade() {
             let slippage_tolerance = Percent::new(5, 100);
-            let amount = CurrencyAmount::from_raw_amount(WETH.clone(), 1_000_000_000).unwrap();
+            let amount = currency_amount!(WETH, 1_000_000_000);
             let route1 = Route::new(
                 vec![DAI_USDC.clone(), USDC_WETH.clone()],
                 DAI.clone(),

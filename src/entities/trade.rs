@@ -838,7 +838,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::*;
+    use crate::{currency_amount, tests::*};
     use num_integer::Roots;
     use num_traits::ToPrimitive;
     use once_cell::sync::Lazy;
@@ -884,64 +884,64 @@ mod tests {
 
     static POOL_0_1: Lazy<Pool<TickListDataProvider>> = Lazy::new(|| {
         v2_style_pool(
-            CurrencyAmount::from_raw_amount(TOKEN0.clone().into(), 100000).unwrap(),
-            CurrencyAmount::from_raw_amount(TOKEN1.clone().into(), 100000).unwrap(),
+            currency_amount!(Currency::from(TOKEN0.clone()), 100000),
+            currency_amount!(Currency::from(TOKEN1.clone()), 100000),
             None,
         )
     });
     static POOL_0_2: Lazy<Pool<TickListDataProvider>> = Lazy::new(|| {
         v2_style_pool(
-            CurrencyAmount::from_raw_amount(TOKEN0.clone().into(), 100000).unwrap(),
-            CurrencyAmount::from_raw_amount(TOKEN2.clone().into(), 110000).unwrap(),
+            currency_amount!(Currency::from(TOKEN0.clone()), 100000),
+            currency_amount!(Currency::from(TOKEN2.clone()), 110000),
             None,
         )
     });
     static POOL_0_3: Lazy<Pool<TickListDataProvider>> = Lazy::new(|| {
         v2_style_pool(
-            CurrencyAmount::from_raw_amount(TOKEN0.clone().into(), 100000).unwrap(),
-            CurrencyAmount::from_raw_amount(TOKEN3.clone().into(), 90000).unwrap(),
+            currency_amount!(Currency::from(TOKEN0.clone()), 100000),
+            currency_amount!(Currency::from(TOKEN3.clone()), 90000),
             None,
         )
     });
     static POOL_1_2: Lazy<Pool<TickListDataProvider>> = Lazy::new(|| {
         v2_style_pool(
-            CurrencyAmount::from_raw_amount(TOKEN1.clone().into(), 120000).unwrap(),
-            CurrencyAmount::from_raw_amount(TOKEN2.clone().into(), 100000).unwrap(),
+            currency_amount!(Currency::from(TOKEN1.clone()), 120000),
+            currency_amount!(Currency::from(TOKEN2.clone()), 100000),
             None,
         )
     });
     static POOL_1_3: Lazy<Pool<TickListDataProvider>> = Lazy::new(|| {
         v2_style_pool(
-            CurrencyAmount::from_raw_amount(TOKEN1.clone().into(), 120000).unwrap(),
-            CurrencyAmount::from_raw_amount(TOKEN3.clone().into(), 130000).unwrap(),
+            currency_amount!(Currency::from(TOKEN1.clone()), 120000),
+            currency_amount!(Currency::from(TOKEN3.clone()), 130000),
             None,
         )
     });
     static POOL_ETH_0: Lazy<Pool<TickListDataProvider>> = Lazy::new(|| {
         v2_style_pool(
-            CurrencyAmount::from_raw_amount(ETHER.clone().into(), 100000).unwrap(),
-            CurrencyAmount::from_raw_amount(TOKEN0.clone().into(), 100000).unwrap(),
+            currency_amount!(Currency::from(ETHER.clone()), 100000),
+            currency_amount!(Currency::from(TOKEN0.clone()), 100000),
             None,
         )
     });
     static POOL_ETH_1: Lazy<Pool<TickListDataProvider>> = Lazy::new(|| {
         v2_style_pool(
-            CurrencyAmount::from_raw_amount(ETHER.clone().into(), 100000).unwrap(),
-            CurrencyAmount::from_raw_amount(TOKEN1.clone().into(), 100000).unwrap(),
+            currency_amount!(Currency::from(ETHER.clone()), 100000),
+            currency_amount!(Currency::from(TOKEN1.clone()), 100000),
             None,
         )
     });
     static POOL_ETH_2: Lazy<Pool<TickListDataProvider>> = Lazy::new(|| {
         v2_style_pool(
-            CurrencyAmount::from_raw_amount(ETHER.clone().into(), 100000).unwrap(),
-            CurrencyAmount::from_raw_amount(TOKEN2.clone().into(), 100000).unwrap(),
+            currency_amount!(Currency::from(ETHER.clone()), 100000),
+            currency_amount!(Currency::from(TOKEN2.clone()), 100000),
             None,
         )
     });
     static POOL_WETH_0: Lazy<Pool<TickListDataProvider>> = Lazy::new(|| {
         v2_style_pool(
-            CurrencyAmount::from_raw_amount(WETH.clone().into(), 100000).unwrap(),
-            CurrencyAmount::from_raw_amount(TOKEN0.clone().into(), 100000).unwrap(),
+            currency_amount!(Currency::from(WETH.clone()), 100000),
+            currency_amount!(Currency::from(TOKEN0.clone()), 100000),
             None,
         )
     });
@@ -953,7 +953,7 @@ mod tests {
         fn can_be_constructed_with_ether_as_input() {
             let trade = Trade::from_route(
                 Route::new(vec![POOL_ETH_0.clone()], ETHER.clone(), TOKEN0.clone()).unwrap(),
-                CurrencyAmount::from_raw_amount(ETHER.clone(), 10000).unwrap(),
+                currency_amount!(ETHER, 10000),
                 TradeType::ExactInput,
             )
             .unwrap();
@@ -965,7 +965,7 @@ mod tests {
         fn can_be_constructed_with_ether_as_input_on_a_weth_pool() {
             let trade = Trade::from_route(
                 Route::new(vec![POOL_WETH_0.clone()], ETHER.clone(), TOKEN0.clone()).unwrap(),
-                CurrencyAmount::from_raw_amount(ETHER.clone(), 10000).unwrap(),
+                currency_amount!(ETHER, 10000),
                 TradeType::ExactInput,
             )
             .unwrap();
@@ -977,7 +977,7 @@ mod tests {
         fn can_be_constructed_with_weth_as_input_on_a_eth_pool() {
             let trade = Trade::from_route(
                 Route::new(vec![POOL_ETH_0.clone()], WETH.clone(), TOKEN0.clone()).unwrap(),
-                CurrencyAmount::from_raw_amount(WETH.clone(), 10000).unwrap(),
+                currency_amount!(WETH, 10000),
                 TradeType::ExactInput,
             )
             .unwrap();
@@ -989,7 +989,7 @@ mod tests {
         fn can_be_constructed_with_ether_as_output_on_a_weth_pool() {
             let trade = Trade::from_route(
                 Route::new(vec![POOL_WETH_0.clone()], TOKEN0.clone(), ETHER.clone()).unwrap(),
-                CurrencyAmount::from_raw_amount(TOKEN0.clone(), 10000).unwrap(),
+                currency_amount!(TOKEN0, 10000),
                 TradeType::ExactInput,
             )
             .unwrap();
@@ -1001,7 +1001,7 @@ mod tests {
         fn can_be_constructed_with_weth_as_output_on_a_eth_pool() {
             let trade = Trade::from_route(
                 Route::new(vec![POOL_ETH_0.clone()], TOKEN0.clone(), WETH.clone()).unwrap(),
-                CurrencyAmount::from_raw_amount(TOKEN0.clone(), 10000).unwrap(),
+                currency_amount!(TOKEN0, 10000),
                 TradeType::ExactInput,
             )
             .unwrap();
@@ -1013,7 +1013,7 @@ mod tests {
         fn can_be_constructed_with_ether_as_input_for_exact_output() {
             let trade = Trade::from_route(
                 Route::new(vec![POOL_ETH_0.clone()], ETHER.clone(), TOKEN0.clone()).unwrap(),
-                CurrencyAmount::from_raw_amount(TOKEN0.clone(), 10000).unwrap(),
+                currency_amount!(TOKEN0, 10000),
                 TradeType::ExactOutput,
             )
             .unwrap();
@@ -1025,7 +1025,7 @@ mod tests {
         fn can_be_constructed_with_ether_as_output() {
             let trade = Trade::from_route(
                 Route::new(vec![POOL_ETH_0.clone()], TOKEN0.clone(), ETHER.clone()).unwrap(),
-                CurrencyAmount::from_raw_amount(ETHER.clone(), 10000).unwrap(),
+                currency_amount!(ETHER, 10000),
                 TradeType::ExactOutput,
             )
             .unwrap();
@@ -1037,7 +1037,7 @@ mod tests {
         fn can_be_constructed_with_ether_as_output_for_exact_input() {
             let trade = Trade::from_route(
                 Route::new(vec![POOL_ETH_0.clone()], TOKEN0.clone(), ETHER.clone()).unwrap(),
-                CurrencyAmount::from_raw_amount(TOKEN0.clone(), 10000).unwrap(),
+                currency_amount!(TOKEN0, 10000),
                 TradeType::ExactInput,
             )
             .unwrap();
@@ -1053,7 +1053,7 @@ mod tests {
         fn can_be_constructed_with_ether_as_input_with_multiple_routes() {
             let trade = Trade::from_routes(
                 vec![(
-                    CurrencyAmount::from_raw_amount(ETHER.clone(), 10000).unwrap(),
+                    currency_amount!(ETHER, 10000),
                     Route::new(vec![POOL_ETH_0.clone()], ETHER.clone(), TOKEN0.clone()).unwrap(),
                 )],
                 TradeType::ExactInput,
@@ -1068,12 +1068,12 @@ mod tests {
             let trade = Trade::from_routes(
                 vec![
                     (
-                        CurrencyAmount::from_raw_amount(TOKEN0.clone(), 3000).unwrap(),
+                        currency_amount!(TOKEN0, 3000),
                         Route::new(vec![POOL_ETH_0.clone()], ETHER.clone(), TOKEN0.clone())
                             .unwrap(),
                     ),
                     (
-                        CurrencyAmount::from_raw_amount(TOKEN0.clone(), 7000).unwrap(),
+                        currency_amount!(TOKEN0, 7000),
                         Route::new(
                             vec![POOL_ETH_1.clone(), POOL_0_1.clone()],
                             ETHER.clone(),
@@ -1094,12 +1094,12 @@ mod tests {
             let trade = Trade::from_routes(
                 vec![
                     (
-                        CurrencyAmount::from_raw_amount(ETHER.clone(), 4000).unwrap(),
+                        currency_amount!(ETHER, 4000),
                         Route::new(vec![POOL_ETH_0.clone()], TOKEN0.clone(), ETHER.clone())
                             .unwrap(),
                     ),
                     (
-                        CurrencyAmount::from_raw_amount(ETHER.clone(), 6000).unwrap(),
+                        currency_amount!(ETHER, 6000),
                         Route::new(
                             vec![POOL_0_1.clone(), POOL_ETH_1.clone()],
                             TOKEN0.clone(),
@@ -1120,12 +1120,12 @@ mod tests {
             let trade = Trade::from_routes(
                 vec![
                     (
-                        CurrencyAmount::from_raw_amount(TOKEN0.clone(), 3000).unwrap(),
+                        currency_amount!(TOKEN0, 3000),
                         Route::new(vec![POOL_ETH_0.clone()], TOKEN0.clone(), ETHER.clone())
                             .unwrap(),
                     ),
                     (
-                        CurrencyAmount::from_raw_amount(TOKEN0.clone(), 7000).unwrap(),
+                        currency_amount!(TOKEN0, 7000),
                         Route::new(
                             vec![POOL_0_1.clone(), POOL_ETH_1.clone()],
                             TOKEN0.clone(),
@@ -1147,7 +1147,7 @@ mod tests {
             let _ = Trade::from_routes(
                 vec![
                     (
-                        CurrencyAmount::from_raw_amount(TOKEN0.clone(), 4500).unwrap(),
+                        currency_amount!(TOKEN0, 4500),
                         Route::new(
                             vec![POOL_0_1.clone(), POOL_ETH_1.clone()],
                             TOKEN0.clone(),
@@ -1156,7 +1156,7 @@ mod tests {
                         .unwrap(),
                     ),
                     (
-                        CurrencyAmount::from_raw_amount(TOKEN0.clone(), 5500).unwrap(),
+                        currency_amount!(TOKEN0, 5500),
                         Route::new(
                             vec![POOL_0_1.clone(), POOL_1_2.clone(), POOL_ETH_2.clone()],
                             TOKEN0.clone(),
@@ -1178,8 +1178,8 @@ mod tests {
         fn throws_if_input_currency_does_not_match_route() {
             Trade::create_unchecked_trade(
                 Route::new(vec![POOL_0_1.clone()], TOKEN0.clone(), TOKEN1.clone()).unwrap(),
-                CurrencyAmount::from_raw_amount(TOKEN2.clone(), 10000).unwrap(),
-                CurrencyAmount::from_raw_amount(TOKEN1.clone(), 10000).unwrap(),
+                currency_amount!(TOKEN2, 10000),
+                currency_amount!(TOKEN1, 10000),
                 TradeType::ExactInput,
             )
             .unwrap();
@@ -1190,8 +1190,8 @@ mod tests {
         fn throws_if_output_currency_does_not_match_route() {
             Trade::create_unchecked_trade(
                 Route::new(vec![POOL_0_1.clone()], TOKEN0.clone(), TOKEN1.clone()).unwrap(),
-                CurrencyAmount::from_raw_amount(TOKEN0.clone(), 10000).unwrap(),
-                CurrencyAmount::from_raw_amount(TOKEN2.clone(), 10000).unwrap(),
+                currency_amount!(TOKEN0, 10000),
+                currency_amount!(TOKEN2, 10000),
                 TradeType::ExactInput,
             )
             .unwrap();
@@ -1201,8 +1201,8 @@ mod tests {
         fn can_create_an_exact_input_trade_without_simulating() {
             Trade::create_unchecked_trade(
                 Route::new(vec![POOL_0_1.clone()], TOKEN0.clone(), TOKEN1.clone()).unwrap(),
-                CurrencyAmount::from_raw_amount(TOKEN0.clone(), 10000).unwrap(),
-                CurrencyAmount::from_raw_amount(TOKEN1.clone(), 100000).unwrap(),
+                currency_amount!(TOKEN0, 10000),
+                currency_amount!(TOKEN1, 100000),
                 TradeType::ExactInput,
             )
             .unwrap();
@@ -1212,8 +1212,8 @@ mod tests {
         fn can_create_an_exact_output_trade_without_simulating() {
             Trade::create_unchecked_trade(
                 Route::new(vec![POOL_0_1.clone()], TOKEN0.clone(), TOKEN1.clone()).unwrap(),
-                CurrencyAmount::from_raw_amount(TOKEN0.clone(), 10000).unwrap(),
-                CurrencyAmount::from_raw_amount(TOKEN1.clone(), 100000).unwrap(),
+                currency_amount!(TOKEN0, 10000),
+                currency_amount!(TOKEN1, 100000),
                 TradeType::ExactOutput,
             )
             .unwrap();
@@ -1230,13 +1230,13 @@ mod tests {
                 vec![
                     Swap::new(
                         Route::new(vec![POOL_1_2.clone()], TOKEN2.clone(), TOKEN1.clone()).unwrap(),
-                        CurrencyAmount::from_raw_amount(TOKEN2.clone(), 2000).unwrap(),
-                        CurrencyAmount::from_raw_amount(TOKEN1.clone(), 2000).unwrap(),
+                        currency_amount!(TOKEN2, 2000),
+                        currency_amount!(TOKEN1, 2000),
                     ),
                     Swap::new(
                         Route::new(vec![POOL_0_1.clone()], TOKEN0.clone(), TOKEN1.clone()).unwrap(),
-                        CurrencyAmount::from_raw_amount(TOKEN2.clone(), 8000).unwrap(),
-                        CurrencyAmount::from_raw_amount(TOKEN1.clone(), 8000).unwrap(),
+                        currency_amount!(TOKEN2, 8000),
+                        currency_amount!(TOKEN1, 8000),
                     ),
                 ],
                 TradeType::ExactInput,
@@ -1251,13 +1251,13 @@ mod tests {
                 vec![
                     Swap::new(
                         Route::new(vec![POOL_0_2.clone()], TOKEN0.clone(), TOKEN2.clone()).unwrap(),
-                        CurrencyAmount::from_raw_amount(TOKEN0.clone(), 10000).unwrap(),
-                        CurrencyAmount::from_raw_amount(TOKEN2.clone(), 10000).unwrap(),
+                        currency_amount!(TOKEN0, 10000),
+                        currency_amount!(TOKEN2, 10000),
                     ),
                     Swap::new(
                         Route::new(vec![POOL_0_1.clone()], TOKEN0.clone(), TOKEN1.clone()).unwrap(),
-                        CurrencyAmount::from_raw_amount(TOKEN0.clone(), 10000).unwrap(),
-                        CurrencyAmount::from_raw_amount(TOKEN2.clone(), 10000).unwrap(),
+                        currency_amount!(TOKEN0, 10000),
+                        currency_amount!(TOKEN2, 10000),
                     ),
                 ],
                 TradeType::ExactInput,
@@ -1271,8 +1271,8 @@ mod tests {
                 vec![
                     Swap::new(
                         Route::new(vec![POOL_0_1.clone()], TOKEN0.clone(), TOKEN1.clone()).unwrap(),
-                        CurrencyAmount::from_raw_amount(TOKEN0.clone(), 5000).unwrap(),
-                        CurrencyAmount::from_raw_amount(TOKEN1.clone(), 50000).unwrap(),
+                        currency_amount!(TOKEN0, 5000),
+                        currency_amount!(TOKEN1, 50000),
                     ),
                     Swap::new(
                         Route::new(
@@ -1281,8 +1281,8 @@ mod tests {
                             TOKEN1.clone(),
                         )
                         .unwrap(),
-                        CurrencyAmount::from_raw_amount(TOKEN0.clone(), 5000).unwrap(),
-                        CurrencyAmount::from_raw_amount(TOKEN1.clone(), 50000).unwrap(),
+                        currency_amount!(TOKEN0, 5000),
+                        currency_amount!(TOKEN1, 50000),
                     ),
                 ],
                 TradeType::ExactInput,
@@ -1296,8 +1296,8 @@ mod tests {
                 vec![
                     Swap::new(
                         Route::new(vec![POOL_0_1.clone()], TOKEN0.clone(), TOKEN1.clone()).unwrap(),
-                        CurrencyAmount::from_raw_amount(TOKEN0.clone(), 5001).unwrap(),
-                        CurrencyAmount::from_raw_amount(TOKEN1.clone(), 50000).unwrap(),
+                        currency_amount!(TOKEN0, 5001),
+                        currency_amount!(TOKEN1, 50000),
                     ),
                     Swap::new(
                         Route::new(
@@ -1306,8 +1306,8 @@ mod tests {
                             TOKEN1.clone(),
                         )
                         .unwrap(),
-                        CurrencyAmount::from_raw_amount(TOKEN0.clone(), 4999).unwrap(),
-                        CurrencyAmount::from_raw_amount(TOKEN1.clone(), 50000).unwrap(),
+                        currency_amount!(TOKEN0, 4999),
+                        currency_amount!(TOKEN1, 50000),
                     ),
                 ],
                 TradeType::ExactOutput,
@@ -1329,8 +1329,8 @@ mod tests {
             .unwrap();
             let trade = Trade::create_unchecked_trade(
                 route.clone(),
-                CurrencyAmount::from_raw_amount(TOKEN0.clone(), 100).unwrap(),
-                CurrencyAmount::from_raw_amount(TOKEN2.clone(), 69).unwrap(),
+                currency_amount!(TOKEN0, 100),
+                currency_amount!(TOKEN2, 69),
                 TradeType::ExactInput,
             )
             .unwrap();
@@ -1347,13 +1347,13 @@ mod tests {
                             TOKEN2.clone(),
                         )
                         .unwrap(),
-                        CurrencyAmount::from_raw_amount(TOKEN0.clone(), 50).unwrap(),
-                        CurrencyAmount::from_raw_amount(TOKEN2.clone(), 35).unwrap(),
+                        currency_amount!(TOKEN0, 50),
+                        currency_amount!(TOKEN2, 35),
                     ),
                     Swap::new(
                         Route::new(vec![POOL_0_2.clone()], TOKEN0.clone(), TOKEN2.clone()).unwrap(),
-                        CurrencyAmount::from_raw_amount(TOKEN0.clone(), 50).unwrap(),
-                        CurrencyAmount::from_raw_amount(TOKEN2.clone(), 34).unwrap(),
+                        currency_amount!(TOKEN0, 50),
+                        currency_amount!(TOKEN2, 34),
                     ),
                 ],
                 TradeType::ExactInput,
@@ -1387,8 +1387,8 @@ mod tests {
                         TOKEN2.clone(),
                     )
                     .unwrap(),
-                    CurrencyAmount::from_raw_amount(TOKEN0.clone(), 100).unwrap(),
-                    CurrencyAmount::from_raw_amount(TOKEN2.clone(), 69).unwrap(),
+                    currency_amount!(TOKEN0, 100),
+                    currency_amount!(TOKEN2, 69),
                     TradeType::ExactInput,
                 )
                 .unwrap()
@@ -1404,14 +1404,14 @@ mod tests {
                                     TOKEN2.clone(),
                                 )
                                 .unwrap(),
-                                CurrencyAmount::from_raw_amount(TOKEN0.clone(), 50).unwrap(),
-                                CurrencyAmount::from_raw_amount(TOKEN2.clone(), 35).unwrap(),
+                                currency_amount!(TOKEN0, 50),
+                                currency_amount!(TOKEN2, 35),
                             ),
                             Swap::new(
                                 Route::new(vec![POOL_0_2.clone()], TOKEN0.clone(), TOKEN2.clone())
                                     .unwrap(),
-                                CurrencyAmount::from_raw_amount(TOKEN0.clone(), 50).unwrap(),
-                                CurrencyAmount::from_raw_amount(TOKEN2.clone(), 34).unwrap(),
+                                currency_amount!(TOKEN0, 50),
+                                currency_amount!(TOKEN2, 34),
                             ),
                         ],
                         TradeType::ExactInput,
@@ -1493,8 +1493,8 @@ mod tests {
                         TOKEN2.clone(),
                     )
                     .unwrap(),
-                    CurrencyAmount::from_raw_amount(TOKEN0.clone(), 156).unwrap(),
-                    CurrencyAmount::from_raw_amount(TOKEN2.clone(), 100).unwrap(),
+                    currency_amount!(TOKEN0, 156),
+                    currency_amount!(TOKEN2, 100),
                     TradeType::ExactOutput,
                 )
                 .unwrap()
@@ -1510,14 +1510,14 @@ mod tests {
                                     TOKEN2.clone(),
                                 )
                                 .unwrap(),
-                                CurrencyAmount::from_raw_amount(TOKEN0.clone(), 78).unwrap(),
-                                CurrencyAmount::from_raw_amount(TOKEN2.clone(), 50).unwrap(),
+                                currency_amount!(TOKEN0, 78),
+                                currency_amount!(TOKEN2, 50),
                             ),
                             Swap::new(
                                 Route::new(vec![POOL_0_2.clone()], TOKEN0.clone(), TOKEN2.clone())
                                     .unwrap(),
-                                CurrencyAmount::from_raw_amount(TOKEN0.clone(), 78).unwrap(),
-                                CurrencyAmount::from_raw_amount(TOKEN2.clone(), 50).unwrap(),
+                                currency_amount!(TOKEN0, 78),
+                                currency_amount!(TOKEN2, 50),
                             ),
                         ],
                         TradeType::ExactOutput,
@@ -1604,8 +1604,8 @@ mod tests {
                             TOKEN2.clone(),
                         )
                         .unwrap(),
-                        CurrencyAmount::from_raw_amount(TOKEN0.clone(), 100).unwrap(),
-                        CurrencyAmount::from_raw_amount(TOKEN2.clone(), 69).unwrap(),
+                        currency_amount!(TOKEN0, 100),
+                        currency_amount!(TOKEN2, 69),
                     )],
                     TradeType::ExactInput,
                 )
@@ -1622,14 +1622,14 @@ mod tests {
                                     TOKEN2.clone(),
                                 )
                                 .unwrap(),
-                                CurrencyAmount::from_raw_amount(TOKEN0.clone(), 90).unwrap(),
-                                CurrencyAmount::from_raw_amount(TOKEN2.clone(), 62).unwrap(),
+                                currency_amount!(TOKEN0, 90),
+                                currency_amount!(TOKEN2, 62),
                             ),
                             Swap::new(
                                 Route::new(vec![POOL_0_2.clone()], TOKEN0.clone(), TOKEN2.clone())
                                     .unwrap(),
-                                CurrencyAmount::from_raw_amount(TOKEN0.clone(), 10).unwrap(),
-                                CurrencyAmount::from_raw_amount(TOKEN2.clone(), 7).unwrap(),
+                                currency_amount!(TOKEN0, 10),
+                                currency_amount!(TOKEN2, 7),
                             ),
                         ],
                         TradeType::ExactInput,
@@ -1692,8 +1692,8 @@ mod tests {
                             TOKEN2.clone(),
                         )
                         .unwrap(),
-                        CurrencyAmount::from_raw_amount(TOKEN0.clone(), 156).unwrap(),
-                        CurrencyAmount::from_raw_amount(TOKEN2.clone(), 100).unwrap(),
+                        currency_amount!(TOKEN0, 156),
+                        currency_amount!(TOKEN2, 100),
                     )],
                     TradeType::ExactOutput,
                 )
@@ -1710,14 +1710,14 @@ mod tests {
                                     TOKEN2.clone(),
                                 )
                                 .unwrap(),
-                                CurrencyAmount::from_raw_amount(TOKEN0.clone(), 140).unwrap(),
-                                CurrencyAmount::from_raw_amount(TOKEN2.clone(), 90).unwrap(),
+                                currency_amount!(TOKEN0, 140),
+                                currency_amount!(TOKEN2, 90),
                             ),
                             Swap::new(
                                 Route::new(vec![POOL_0_2.clone()], TOKEN0.clone(), TOKEN2.clone())
                                     .unwrap(),
-                                CurrencyAmount::from_raw_amount(TOKEN0.clone(), 16).unwrap(),
-                                CurrencyAmount::from_raw_amount(TOKEN2.clone(), 10).unwrap(),
+                                currency_amount!(TOKEN0, 16),
+                                currency_amount!(TOKEN2, 10),
                             ),
                         ],
                         TradeType::ExactOutput,
