@@ -34,6 +34,9 @@ pub mod utils;
 
 pub use uniswap_v3_sdk::multicall;
 
+#[cfg(feature = "extensions")]
+pub mod extensions;
+
 #[cfg(test)]
 mod tests;
 
@@ -42,4 +45,7 @@ pub mod prelude {
 
     pub use uniswap_sdk_core as sdk_core;
     pub use uniswap_v3_sdk as v3_sdk;
+
+    #[cfg(feature = "extensions")]
+    pub use crate::extensions::*;
 }

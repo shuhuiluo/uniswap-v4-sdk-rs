@@ -1,5 +1,6 @@
 use crate::entities::Pool;
 pub(crate) use alloc::vec;
+use alloy_primitives::address;
 use once_cell::sync::Lazy;
 use uniswap_sdk_core::{prelude::*, token};
 use uniswap_v3_sdk::prelude::*;
@@ -127,4 +128,50 @@ macro_rules! trade_from_route {
             .await
             .unwrap()
     };
+}
+
+#[cfg(feature = "extensions")]
+pub(crate) use extensions::*;
+
+#[cfg(feature = "extensions")]
+mod extensions {
+    use super::*;
+    use crate::abi::IStateView;
+    use alloy::{
+        eips::BlockId,
+        providers::{ProviderBuilder, RootProvider},
+        transports::http::reqwest::Url,
+    };
+
+    pub(crate) static RPC_URL: Lazy<Url> = Lazy::new(|| {
+        dotenv::dotenv().ok();
+        std::env::var("MAINNET_RPC_URL").unwrap().parse().unwrap()
+    });
+
+    pub(crate) static PROVIDER: Lazy<RootProvider> = Lazy::new(|| {
+        ProviderBuilder::new()
+            .disable_recommended_fillers()
+            .on_http(RPC_URL.clone())
+    });
+
+    pub(crate) static BLOCK_ID: Lazy<Option<BlockId>> = Lazy::new(|| Some(BlockId::from(22305544)));
+
+    pub(crate) static POOL_ID_ETH_USDC: Lazy<B256> = Lazy::new(|| {
+        Pool::get_pool_id(
+            &ETHER.clone().into(),
+            &USDC.clone().into(),
+            FeeAmount::LOW.into(),
+            10,
+            Address::ZERO,
+        )
+        .unwrap()
+    });
+
+    pub(crate) static STATE_VIEW: Lazy<IStateView::IStateViewInstance<(), RootProvider>> =
+        Lazy::new(|| {
+            IStateView::new(
+                address!("0x7fFE42C4a5DEeA5b0feC41C94C136Cf115597227"),
+                PROVIDER.clone(),
+            )
+        });
 }

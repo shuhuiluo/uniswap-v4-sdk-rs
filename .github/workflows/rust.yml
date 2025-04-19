@@ -91,9 +91,13 @@ jobs:
         run: cargo build
       - name: Build with std feature
         run: cargo build --features std
-      - name: Run tests
+      - name: Build with extensions
+        run: cargo build --features extensions
+      - name: Run tests for core library
         run: cargo test
       - name: Run tests for std feature
         run: cargo test --features std
+      - name: Run tests for extensions
+        run: cargo test --features extensions --lib extensions -- --test-threads=1
       - name: Run doc tests
         run: cargo test --doc --all-features
