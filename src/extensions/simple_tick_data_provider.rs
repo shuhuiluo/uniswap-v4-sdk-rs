@@ -1,25 +1,29 @@
 use super::PoolManagerLens;
-use alloy::{eips::BlockId, network::Network, providers::Provider};
+use alloy::{
+    eips::BlockId,
+    network::{Ethereum, Network},
+    providers::Provider,
+};
 use alloy_primitives::{aliases::I24, Address, B256, U256};
 use uniswap_v3_sdk::prelude::*;
 
 #[derive(Clone, Debug)]
-pub struct SimpleTickDataProvider<N, P, I = I24>
+pub struct SimpleTickDataProvider<P, N = Ethereum, I = I24>
 where
-    N: Network,
     P: Provider<N>,
+    N: Network,
     I: TickIndex,
 {
-    pub lens: PoolManagerLens<N, P>,
+    pub lens: PoolManagerLens<P, N>,
     pub pool_id: B256,
     pub block_id: Option<BlockId>,
     _tick_index: core::marker::PhantomData<I>,
 }
 
-impl<N, P, I> SimpleTickDataProvider<N, P, I>
+impl<P, N, I> SimpleTickDataProvider<P, N, I>
 where
-    N: Network,
     P: Provider<N>,
+    N: Network,
     I: TickIndex,
 {
     #[inline]
@@ -38,10 +42,10 @@ where
     }
 }
 
-impl<N, P, I> TickBitMapProvider for SimpleTickDataProvider<N, P, I>
+impl<P, N, I> TickBitMapProvider for SimpleTickDataProvider<P, N, I>
 where
-    N: Network,
     P: Provider<N>,
+    N: Network,
     I: TickIndex,
 {
     type Index = I;
@@ -54,10 +58,10 @@ where
     }
 }
 
-impl<N, P, I> TickDataProvider for SimpleTickDataProvider<N, P, I>
+impl<P, N, I> TickDataProvider for SimpleTickDataProvider<P, N, I>
 where
-    N: Network,
     P: Provider<N>,
+    N: Network,
     I: TickIndex,
 {
     type Index = I;
