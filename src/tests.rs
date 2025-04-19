@@ -128,3 +128,20 @@ macro_rules! trade_from_route {
             .unwrap()
     };
 }
+
+#[cfg(feature = "extensions")]
+pub(crate) static RPC_URL: Lazy<alloy::transports::http::reqwest::Url> = Lazy::new(|| {
+    dotenv::dotenv().ok();
+    std::env::var("MAINNET_RPC_URL").unwrap().parse().unwrap()
+});
+
+#[cfg(feature = "extensions")]
+pub(crate) static PROVIDER: Lazy<alloy::providers::RootProvider> = Lazy::new(|| {
+    alloy::providers::ProviderBuilder::new()
+        .disable_recommended_fillers()
+        .on_http(RPC_URL.clone())
+});
+
+#[cfg(feature = "extensions")]
+pub(crate) static BLOCK_ID: Lazy<Option<alloy::eips::BlockId>> =
+    Lazy::new(|| Some(alloy::eips::BlockId::from(22305544)));

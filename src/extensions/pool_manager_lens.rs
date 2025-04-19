@@ -116,3 +116,129 @@ where
         Ok((liquidity_gross, liquidity_net))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{abi::IStateView, prelude::Pool, tests::*};
+    use alloy::providers::RootProvider;
+    use alloy_primitives::address;
+    use once_cell::sync::Lazy;
+
+    const TICK_SPACING: i32 = 10;
+    static POOL_ID: Lazy<B256> = Lazy::new(|| {
+        Pool::get_pool_id(
+            &ETHER.clone().into(),
+            &USDC.clone().into(),
+            FeeAmount::LOW.into(),
+            TICK_SPACING,
+            Address::ZERO,
+        )
+        .unwrap()
+    });
+    static POOL_MANAGER: Lazy<PoolManagerLens<RootProvider>> = Lazy::new(|| {
+        PoolManagerLens::new(
+            address!("0x000000000004444c5dc75cB358380D2e3dE08A90"),
+            PROVIDER.clone(),
+        )
+    });
+    static STATE_VIEW: Lazy<IStateView::IStateViewInstance<(), RootProvider>> = Lazy::new(|| {
+        IStateView::new(
+            address!("0x7fFE42C4a5DEeA5b0feC41C94C136Cf115597227"),
+            PROVIDER.clone(),
+        )
+    });
+
+    macro_rules! assert_tick_bitmap_match {
+        ($pool_id:expr, $pos:expr, $block_id:expr) => {
+            let bitmap_lens = POOL_MANAGER
+                .get_tick_bitmap($pool_id, $pos, $block_id)
+                .await
+                .unwrap();
+            let bitmap_state_view = STATE_VIEW
+                .getTickBitmap($pool_id, $pos as i16)
+                .block($block_id.unwrap())
+                .call()
+                .await
+                .unwrap()
+                .tickBitmap;
+
+            assert_ne!(bitmap_lens, U256::ZERO);
+            assert_eq!(bitmap_lens, bitmap_state_view);
+        };
+    }
+
+    #[tokio::test]
+    async fn test_get_tick_bitmap() {
+        let slot0 = STATE_VIEW
+            .getSlot0(*POOL_ID)
+            .block(BLOCK_ID.unwrap())
+            .call()
+            .await
+            .unwrap();
+
+        let word = slot0.tick.as_i32().compress(TICK_SPACING).position().0;
+        for pos in word - 2..=word + 2 {
+            assert_tick_bitmap_match!(*POOL_ID, pos, *BLOCK_ID);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_tick_bitmap_edge_cases() {
+        let word = MIN_TICK_I32.compress(TICK_SPACING).position().0;
+        assert_tick_bitmap_match!(*POOL_ID, word, *BLOCK_ID);
+
+        let word = MAX_TICK_I32.compress(TICK_SPACING).position().0;
+        assert_tick_bitmap_match!(*POOL_ID, word, *BLOCK_ID);
+    }
+
+    macro_rules! assert_tick_liquidity_match {
+        ($pool_id:expr, $tick:expr, $block_id:expr) => {
+            let (liquidity_gross_lens, liquidity_net_lens) = POOL_MANAGER
+                .get_tick_liquidity($pool_id, $tick, $block_id)
+                .await
+                .unwrap();
+            let tick_liquidity = STATE_VIEW
+                .getTickLiquidity($pool_id, $tick.to_i24())
+                .block($block_id.unwrap())
+                .call()
+                .await
+                .unwrap();
+
+            assert_ne!(liquidity_gross_lens, 0);
+            assert_eq!(liquidity_gross_lens, tick_liquidity.liquidityGross);
+            assert_ne!(liquidity_net_lens, 0);
+            assert_eq!(liquidity_net_lens, tick_liquidity.liquidityNet);
+        };
+    }
+
+    #[tokio::test]
+    async fn test_get_tick_liquidity() {
+        let slot0 = STATE_VIEW
+            .getSlot0(*POOL_ID)
+            .block(BLOCK_ID.unwrap())
+            .call()
+            .await
+            .unwrap();
+
+        // find the nearest populated tick
+        let word = slot0.tick.as_i32().compress(TICK_SPACING).position().0;
+        let bitmap = POOL_MANAGER
+            .get_tick_bitmap(*POOL_ID, word, *BLOCK_ID)
+            .await
+            .unwrap();
+        let msb = most_significant_bit(bitmap);
+        let tick = ((word << 8) + msb as i32) * TICK_SPACING;
+
+        assert_tick_liquidity_match!(*POOL_ID, tick, *BLOCK_ID);
+    }
+
+    #[tokio::test]
+    async fn test_get_tick_liquidity_edge_cases() {
+        let tick = nearest_usable_tick(MIN_TICK_I32, TICK_SPACING);
+        assert_tick_liquidity_match!(*POOL_ID, tick, *BLOCK_ID);
+
+        let tick = nearest_usable_tick(MAX_TICK_I32, TICK_SPACING);
+        assert_tick_liquidity_match!(*POOL_ID, tick, *BLOCK_ID);
+    }
+}

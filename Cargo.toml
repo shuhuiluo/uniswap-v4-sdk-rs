@@ -16,7 +16,7 @@ exclude = [".github", ".gitignore", "rustfmt.toml"]
 all-features = true
 
 [dependencies]
-alloy = { version = "0.13", default-features = false, features = ["contract"] }
+alloy = { version = "0.13", optional = true, default-features = false, features = ["contract"] }
 alloy-primitives = { version = "0.8", default-features = false }
 alloy-sol-types = { version = "0.8", default-features = false }
 derive_more = { version = "2", default-features = false, features = ["deref", "deref_mut"] }
@@ -26,7 +26,8 @@ uniswap-sdk-core = "4.0.1"
 uniswap-v3-sdk = "4.2.0"
 
 [dev-dependencies]
-alloy = { version = "0.13", default-features = false, features = ["signer-local"] }
+alloy = { version = "0.13", default-features = false, features = ["reqwest", "signer-local"] }
+dotenv = "0.15.0"
 num-integer = { version = "0.1", default-features = false }
 once_cell = "1.21"
 tokio = { version = "1.44", features = ["full"] }
@@ -34,10 +35,13 @@ tokio = { version = "1.44", features = ["full"] }
 [features]
 default = []
 std = [
+    "alloy-sol-types/std",
+    "alloy?/std",
     "thiserror/std",
     "uniswap-sdk-core/std",
     "uniswap-v3-sdk/std"
 ]
 extensions = [
+    "alloy",
     "uniswap-v3-sdk/extensions"
 ]

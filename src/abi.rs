@@ -222,3 +222,48 @@ alloy::sol! {
         function extsload(bytes32[] calldata slots) external view returns (bytes32[] memory values);
     }
 }
+
+#[cfg(all(test, feature = "extensions"))]
+alloy::sol! {
+    type PoolId is bytes32;
+
+    #[sol(rpc)]
+    #[derive(Debug)]
+    interface IStateView {
+        function getSlot0(PoolId poolId)
+            external
+            view
+            returns (uint160 sqrtPriceX96, int24 tick, uint24 protocolFee, uint24 lpFee);
+        function getTickInfo(PoolId poolId, int24 tick)
+            external
+            view
+            returns (uint128 liquidityGross, int128 liquidityNet, uint256 feeGrowthOutside0X128, uint256 feeGrowthOutside1X128);
+        function getTickLiquidity(PoolId poolId, int24 tick)
+            external
+            view
+            returns (uint128 liquidityGross, int128 liquidityNet);
+        function getTickFeeGrowthOutside(PoolId poolId, int24 tick)
+            external
+            view
+            returns (uint256 feeGrowthOutside0X128, uint256 feeGrowthOutside1X128);
+        function getFeeGrowthGlobals(PoolId poolId)
+            external
+            view
+            returns (uint256 feeGrowthGlobal0, uint256 feeGrowthGlobal1);
+        function getLiquidity(PoolId poolId) external view returns (uint128 liquidity);
+        function getTickBitmap(PoolId poolId, int16 tick) external view returns (uint256 tickBitmap);
+        function getPositionInfo(PoolId poolId, address owner, int24 tickLower, int24 tickUpper, bytes32 salt)
+            external
+            view
+            returns (uint128 liquidity, uint256 feeGrowthInside0LastX128, uint256 feeGrowthInside1LastX128);
+        function getPositionInfo(PoolId poolId, bytes32 positionId)
+            external
+            view
+            returns (uint128 liquidity, uint256 feeGrowthInside0LastX128, uint256 feeGrowthInside1LastX128);
+        function getPositionLiquidity(PoolId poolId, bytes32 positionId) external view returns (uint128 liquidity);
+        function getFeeGrowthInside(PoolId poolId, int24 tickLower, int24 tickUpper)
+            external
+            view
+            returns (uint256 feeGrowthInside0X128, uint256 feeGrowthInside1X128);
+    }
+}
