@@ -120,31 +120,15 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{abi::IStateView, prelude::Pool, tests::*};
+    use crate::tests::*;
     use alloy::providers::RootProvider;
     use alloy_primitives::address;
     use once_cell::sync::Lazy;
 
     const TICK_SPACING: i32 = 10;
-    static POOL_ID: Lazy<B256> = Lazy::new(|| {
-        Pool::get_pool_id(
-            &ETHER.clone().into(),
-            &USDC.clone().into(),
-            FeeAmount::LOW.into(),
-            TICK_SPACING,
-            Address::ZERO,
-        )
-        .unwrap()
-    });
     static POOL_MANAGER: Lazy<PoolManagerLens<RootProvider>> = Lazy::new(|| {
         PoolManagerLens::new(
             address!("0x000000000004444c5dc75cB358380D2e3dE08A90"),
-            PROVIDER.clone(),
-        )
-    });
-    static STATE_VIEW: Lazy<IStateView::IStateViewInstance<(), RootProvider>> = Lazy::new(|| {
-        IStateView::new(
-            address!("0x7fFE42C4a5DEeA5b0feC41C94C136Cf115597227"),
             PROVIDER.clone(),
         )
     });
@@ -171,7 +155,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_tick_bitmap() {
         let slot0 = STATE_VIEW
-            .getSlot0(*POOL_ID)
+            .getSlot0(*POOL_ID_ETH_USDC)
             .block(BLOCK_ID.unwrap())
             .call()
             .await
@@ -179,17 +163,17 @@ mod tests {
 
         let word = slot0.tick.as_i32().compress(TICK_SPACING).position().0;
         for pos in word - 2..=word + 2 {
-            assert_tick_bitmap_match!(*POOL_ID, pos, *BLOCK_ID);
+            assert_tick_bitmap_match!(*POOL_ID_ETH_USDC, pos, *BLOCK_ID);
         }
     }
 
     #[tokio::test]
     async fn test_get_tick_bitmap_edge_cases() {
         let word = MIN_TICK_I32.compress(TICK_SPACING).position().0;
-        assert_tick_bitmap_match!(*POOL_ID, word, *BLOCK_ID);
+        assert_tick_bitmap_match!(*POOL_ID_ETH_USDC, word, *BLOCK_ID);
 
         let word = MAX_TICK_I32.compress(TICK_SPACING).position().0;
-        assert_tick_bitmap_match!(*POOL_ID, word, *BLOCK_ID);
+        assert_tick_bitmap_match!(*POOL_ID_ETH_USDC, word, *BLOCK_ID);
     }
 
     macro_rules! assert_tick_liquidity_match {
@@ -215,7 +199,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_tick_liquidity() {
         let slot0 = STATE_VIEW
-            .getSlot0(*POOL_ID)
+            .getSlot0(*POOL_ID_ETH_USDC)
             .block(BLOCK_ID.unwrap())
             .call()
             .await
@@ -224,21 +208,21 @@ mod tests {
         // find the nearest populated tick
         let word = slot0.tick.as_i32().compress(TICK_SPACING).position().0;
         let bitmap = POOL_MANAGER
-            .get_tick_bitmap(*POOL_ID, word, *BLOCK_ID)
+            .get_tick_bitmap(*POOL_ID_ETH_USDC, word, *BLOCK_ID)
             .await
             .unwrap();
         let msb = most_significant_bit(bitmap);
         let tick = ((word << 8) + msb as i32) * TICK_SPACING;
 
-        assert_tick_liquidity_match!(*POOL_ID, tick, *BLOCK_ID);
+        assert_tick_liquidity_match!(*POOL_ID_ETH_USDC, tick, *BLOCK_ID);
     }
 
     #[tokio::test]
     async fn test_get_tick_liquidity_edge_cases() {
         let tick = nearest_usable_tick(MIN_TICK_I32, TICK_SPACING);
-        assert_tick_liquidity_match!(*POOL_ID, tick, *BLOCK_ID);
+        assert_tick_liquidity_match!(*POOL_ID_ETH_USDC, tick, *BLOCK_ID);
 
         let tick = nearest_usable_tick(MAX_TICK_I32, TICK_SPACING);
-        assert_tick_liquidity_match!(*POOL_ID, tick, *BLOCK_ID);
+        assert_tick_liquidity_match!(*POOL_ID_ETH_USDC, tick, *BLOCK_ID);
     }
 }
