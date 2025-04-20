@@ -1,5 +1,5 @@
 #![doc = include_str!("../README.md")]
-#![cfg_attr(not(feature = "std"), no_std)]
+#![cfg_attr(not(any(feature = "std", all(test, feature = "extensions"))), no_std)]
 #![warn(
     missing_copy_implementations,
     missing_debug_implementations,
@@ -22,7 +22,7 @@
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
 #![deny(unused_must_use, rust_2018_idioms)]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
-#![allow(dead_code)]
+#![cfg_attr(test, allow(dead_code))]
 
 extern crate alloc;
 

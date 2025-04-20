@@ -1,3 +1,5 @@
+//! Extensions to the core library.
+
 mod pool_manager_lens;
 mod simple_tick_data_provider;
 

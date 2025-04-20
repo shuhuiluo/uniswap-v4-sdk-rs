@@ -1,3 +1,9 @@
+//! ## Pool Manager Lens
+//! This module provides a lens for querying the Uniswap V4 pool manager. It is similar to
+//! [`StateView`](https://github.com/Uniswap/v4-periphery/blob/main/src/lens/StateView.sol), but
+//! does the slot calculation and ABI decoding in Rust instead of Solidity. It does not require
+//! contract deployment and uses `extsload` to read the state under the hood.
+
 use crate::abi::IExtsload;
 use alloy::{
     eips::{BlockId, BlockNumberOrTag},

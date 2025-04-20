@@ -15,6 +15,12 @@ It is feature-complete but missing unit tests.
 - Usage of [alloy-rs](https://github.com/alloy-rs) types
 - Consistent API and types with the [V3 SDK](https://github.com/shuhuiluo/uniswap-v3-sdk-rs)
   and [SDK Core](https://github.com/malik672/uniswap-sdk-core-rust)
+- An [`extensions`](./src/extensions) feature for additional functionalities related to Uniswap V4, including:
+
+    - [`pool_manager_lens`](./src/extensions/pool_manager_lens.rs) module for querying the Uniswap V4 pool manager.
+      Similar to [`StateView`](https://github.com/Uniswap/v4-periphery/blob/main/src/lens/StateView.sol).
+    - [`simple_tick_data_provider`](./src/extensions/simple_tick_data_provider.rs) module for fetching tick data from
+      the Uniswap V4 pool manager contract directly via RPC calls
 
 ## Supported Rust Versions (MSRV)
 
@@ -22,10 +28,28 @@ It is feature-complete but missing unit tests.
 When updating this, also update:
 - clippy.toml
 - Cargo.toml
-- .github/workflows/ci.yml
+- .github/workflows/rust.yml
 -->
 
 The current MSRV (minimum supported rust version) is 1.83.
+
+## Getting started
+
+Add the following to your `Cargo.toml` file:
+
+```toml
+uniswap-v4-sdk = { version = "0.5.1", features = ["extensions", "std"] }
+```
+
+### Usage
+
+The package structure follows that of the TypeScript SDK, but with `snake_case` instead of `camelCase`.
+
+For easy import, use the prelude:
+
+```rust
+use uniswap_v4_sdk::prelude::*;
+```
 
 ## Note on `no_std`
 

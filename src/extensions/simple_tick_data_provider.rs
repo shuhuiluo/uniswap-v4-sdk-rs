@@ -1,3 +1,7 @@
+//! ## Simple Tick Data Provider
+//! A data provider that fetches tick data from the Uniswap V4 pool manager contract on the fly
+//! using [`PoolManagerLens`].
+
 use super::PoolManagerLens;
 use alloy::{
     eips::BlockId,
