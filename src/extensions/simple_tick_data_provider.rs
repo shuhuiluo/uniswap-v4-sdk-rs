@@ -44,6 +44,18 @@ where
             _tick_index: core::marker::PhantomData,
         }
     }
+
+    #[inline]
+    pub const fn block_id(mut self, block_id: Option<BlockId>) -> Self {
+        self.block_id = block_id;
+        self
+    }
+
+    #[inline]
+    pub const fn pool_id(mut self, pool_id: B256) -> Self {
+        self.pool_id = pool_id;
+        self
+    }
 }
 
 impl<P, N, I> TickBitMapProvider for SimpleTickDataProvider<P, N, I>
