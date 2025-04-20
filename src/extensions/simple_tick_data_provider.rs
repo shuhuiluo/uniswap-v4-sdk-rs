@@ -2,7 +2,7 @@
 //! A data provider that fetches tick data from the Uniswap V4 pool manager contract on the fly
 //! using [`PoolManagerLens`].
 
-use super::PoolManagerLens;
+use crate::prelude::{map_contract_error, PoolManagerLens};
 use alloy::{
     eips::BlockId,
     network::{Ethereum, Network},
@@ -71,6 +71,7 @@ where
         self.lens
             .get_tick_bitmap(self.pool_id, index, self.block_id)
             .await
+            .map_err(map_contract_error)
     }
 }
 
@@ -87,7 +88,8 @@ where
         let (liquidity_gross, liquidity_net) = self
             .lens
             .get_tick_liquidity(self.pool_id, index, self.block_id)
-            .await?;
+            .await
+            .map_err(map_contract_error)?;
         Ok(Tick {
             index,
             liquidity_gross,
@@ -111,18 +113,21 @@ where
 mod tests {
     use super::*;
     use crate::tests::*;
-    use alloy_primitives::address;
+    use uniswap_sdk_core::addresses::CHAIN_TO_ADDRESSES_MAP;
 
     const TICK_SPACING: i32 = 10;
-    const POOL_MANAGER: Address = address!("0x000000000004444c5dc75cB358380D2e3dE08A90");
 
     #[tokio::test]
     async fn test_v4_simple_tick_data_provider() -> Result<(), Error> {
         let provider = SimpleTickDataProvider::new(
-            POOL_MANAGER,
+            CHAIN_TO_ADDRESSES_MAP
+                .get(&1)
+                .unwrap()
+                .v4_pool_manager
+                .unwrap(),
             *POOL_ID_ETH_USDC,
             PROVIDER.clone(),
-            *BLOCK_ID,
+            BLOCK_ID,
         );
 
         let slot0 = STATE_VIEW

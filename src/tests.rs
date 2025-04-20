@@ -1,6 +1,5 @@
 use crate::entities::Pool;
 pub(crate) use alloc::vec;
-use alloy_primitives::address;
 use once_cell::sync::Lazy;
 use uniswap_sdk_core::{prelude::*, token};
 use uniswap_v3_sdk::prelude::*;
@@ -138,7 +137,7 @@ mod extensions {
     use super::*;
     use crate::abi::IStateView;
     use alloy::{
-        eips::BlockId,
+        eips::{BlockId, BlockNumberOrTag},
         providers::{ProviderBuilder, RootProvider},
         transports::http::reqwest::Url,
     };
@@ -154,7 +153,8 @@ mod extensions {
             .on_http(RPC_URL.clone())
     });
 
-    pub(crate) static BLOCK_ID: Lazy<Option<BlockId>> = Lazy::new(|| Some(BlockId::from(22305544)));
+    pub(crate) const BLOCK_ID: Option<BlockId> =
+        Some(BlockId::Number(BlockNumberOrTag::Number(22305544)));
 
     pub(crate) static POOL_ID_ETH_USDC: Lazy<B256> = Lazy::new(|| {
         Pool::get_pool_id(
@@ -170,7 +170,11 @@ mod extensions {
     pub(crate) static STATE_VIEW: Lazy<IStateView::IStateViewInstance<(), RootProvider>> =
         Lazy::new(|| {
             IStateView::new(
-                address!("0x7fFE42C4a5DEeA5b0feC41C94C136Cf115597227"),
+                CHAIN_TO_ADDRESSES_MAP
+                    .get(&1)
+                    .unwrap()
+                    .v4_state_view
+                    .unwrap(),
                 PROVIDER.clone(),
             )
         });

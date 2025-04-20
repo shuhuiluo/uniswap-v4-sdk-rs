@@ -8,6 +8,7 @@ use uniswap_sdk_core::error::Error as CoreError;
 use uniswap_v3_sdk::error::Error as V3Error;
 
 #[derive(Debug, thiserror::Error)]
+#[cfg_attr(not(feature = "extensions"), derive(Clone, PartialEq))]
 pub enum Error {
     /// Thrown when an error occurs in the core library.
     #[error("{0}")]
@@ -36,4 +37,16 @@ pub enum Error {
 
     #[error("Insufficient liquidity")]
     InsufficientLiquidity,
+
+    #[cfg(feature = "extensions")]
+    #[error("{0}")]
+    ContractError(#[from] alloy::contract::Error),
+}
+
+#[cfg(feature = "extensions")]
+pub fn map_contract_error(e: Error) -> V3Error {
+    match e {
+        Error::ContractError(contract_error) => V3Error::ContractError(contract_error),
+        _ => panic!("Unexpected error: {:?}", e),
+    }
 }

@@ -1,6 +1,6 @@
 [package]
 name = "uniswap-v4-sdk"
-version = "0.5.1"
+version = "0.6.0"
 edition = "2021"
 rust-version = "1.83"
 authors = ["Shuhui Luo <twitter.com/aureliano_law>"]
@@ -22,8 +22,8 @@ alloy-sol-types = { version = "0.8", default-features = false }
 derive_more = { version = "2", default-features = false, features = ["deref", "deref_mut"] }
 num-traits = { version = "0.2", default-features = false, features = ["libm"] }
 thiserror = { version = "2", default-features = false }
-uniswap-sdk-core = "4.0.1"
-uniswap-v3-sdk = "4.2.0"
+uniswap-sdk-core = "4.1.0"
+uniswap-v3-sdk = "4.3.0"
 
 [dev-dependencies]
 alloy = { version = "0.13", default-features = false, features = ["reqwest", "signer-local"] }
