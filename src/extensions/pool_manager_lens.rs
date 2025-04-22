@@ -20,7 +20,6 @@ use uniswap_v3_sdk::prelude::*;
 
 const POOLS_SLOT: U256 = uint!(6_U256);
 const FEE_GROWTH_GLOBAL0_OFFSET: U256 = uint!(1_U256);
-const FEE_GROWTH_GLOBAL1_OFFSET: U256 = uint!(2_U256);
 const LIQUIDITY_OFFSET: U256 = uint!(3_U256);
 const TICKS_OFFSET: U256 = uint!(4_U256);
 const TICK_BITMAP_OFFSET: U256 = uint!(5_U256);
@@ -117,29 +116,50 @@ where
         Ok((sqrt_price_x96, tick, protocol_fee, lp_fee))
     }
 
-    /// Retrieves the tick bitmap of a pool at a specific tick
+    /// Retrieves full tick information from a pool at a specific tick
     ///
     /// ## Arguments
     ///
     /// * `pool_id`: The ID of the pool
-    /// * `tick`: The tick to retrieve the bitmap for
+    /// * `tick`: The tick to retrieve information for
     /// * `block_id`: Optional block ID to query at
+    ///
+    /// ## Returns
+    ///
+    /// * `liquidity_gross`: The total position liquidity that references this tick
+    /// * `liquidity_net`: The amount of net liquidity added (subtracted) when tick is crossed from
+    ///   left to right (right to left)
+    /// * `fee_growth_outside0_x128`: Fee growth per unit of liquidity on the other side of this
+    ///   tick for token0
+    /// * `fee_growth_outside1_x128`: Fee growth per unit of liquidity on the other side of this
+    ///   tick for token1
     #[inline]
-    pub async fn get_tick_bitmap<I: TickIndex>(
+    pub async fn get_tick_info<I: TickIndex>(
         &self,
         pool_id: B256,
         tick: I,
         block_id: Option<BlockId>,
-    ) -> Result<U256, Error> {
+    ) -> Result<(u128, i128, U256, U256), Error> {
         let block_id = block_id.unwrap_or(BlockId::Number(BlockNumberOrTag::Latest));
-        let slot = get_tick_bitmap_slot(pool_id, tick);
-        let word = self
+        let slot = get_tick_info_slot(pool_id, tick);
+        let data = self
             .manager
-            .extsload_0(B256::from(slot))
+            .extsload_1(B256::from(slot), uint!(3_U256))
             .block(block_id)
             .call()
-            .await?;
-        Ok(U256::from_be_bytes(word.value.0))
+            .await?
+            .values;
+
+        let (liquidity_gross, liquidity_net) = decode_liquidity_gross_and_net(data[0]);
+        let fee_growth_outside0_x128 = U256::from_be_bytes(data[1].0);
+        let fee_growth_outside1_x128 = U256::from_be_bytes(data[2].0);
+
+        Ok((
+            liquidity_gross,
+            liquidity_net,
+            fee_growth_outside0_x128,
+            fee_growth_outside1_x128,
+        ))
     }
 
     /// Retrieves the liquidity information of a pool at a specific tick
@@ -171,24 +191,284 @@ where
             .call()
             .await?
             .value;
-        // In Solidity:
-        // liquidityNet := sar(128, value)
-        // liquidityGross := and(value, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF)
-        let liquidity_gross = unsafe {
-            // Create a pointer to the start of the second half of the array
-            let gross_ptr = value.as_ptr().add(16) as *const u128;
-            // Read the value in big-endian format
-            u128::from_be(gross_ptr.read_unaligned())
-        };
+        Ok(decode_liquidity_gross_and_net(value))
+    }
 
-        let liquidity_net = unsafe {
-            // Create a pointer to the start of the first half of the array
-            let net_ptr = value.as_ptr() as *const i128;
-            // Read the value in big-endian format
-            i128::from_be(net_ptr.read_unaligned())
-        };
+    /// Retrieves the fee growth outside a tick of a pool
+    ///
+    /// ## Arguments
+    ///
+    /// * `pool_id`: The ID of the pool
+    /// * `tick`: The tick to retrieve fee growth for
+    /// * `block_id`: Optional block ID to query at
+    ///
+    /// ## Returns
+    ///
+    /// * `fee_growth_outside0_x128`: Fee growth per unit of liquidity on the other side of this
+    ///   tick for token0
+    /// * `fee_growth_outside1_x128`: Fee growth per unit of liquidity on the other side of this
+    ///   tick for token1
+    #[inline]
+    pub async fn get_tick_fee_growth_outside<I: TickIndex>(
+        &self,
+        pool_id: B256,
+        tick: I,
+        block_id: Option<BlockId>,
+    ) -> Result<(U256, U256), Error> {
+        let block_id = block_id.unwrap_or(BlockId::Number(BlockNumberOrTag::Latest));
+        let slot = B256::from(get_tick_info_slot(pool_id, tick) + uint!(1_U256));
+        let data = self
+            .manager
+            .extsload_1(slot, uint!(2_U256))
+            .block(block_id)
+            .call()
+            .await?
+            .values;
 
-        Ok((liquidity_gross, liquidity_net))
+        let fee_growth_outside0_x128 = U256::from_be_bytes(data[0].0);
+        let fee_growth_outside1_x128 = U256::from_be_bytes(data[1].0);
+
+        Ok((fee_growth_outside0_x128, fee_growth_outside1_x128))
+    }
+
+    /// Retrieves the global fee growth of a pool
+    ///
+    /// ## Arguments
+    ///
+    /// * `pool_id`: The ID of the pool
+    /// * `block_id`: Optional block ID to query at
+    ///
+    /// ## Returns
+    ///
+    /// * `fee_growth_global0`: The global fee growth for token0
+    /// * `fee_growth_global1`: The global fee growth for token1
+    #[inline]
+    pub async fn get_fee_growth_globals(
+        &self,
+        pool_id: B256,
+        block_id: Option<BlockId>,
+    ) -> Result<(U256, U256), Error> {
+        let block_id = block_id.unwrap_or(BlockId::Number(BlockNumberOrTag::Latest));
+        let state_slot = get_pool_state_slot(pool_id);
+        let slot_fee_growth_global0 = B256::from(state_slot + FEE_GROWTH_GLOBAL0_OFFSET);
+        let data = self
+            .manager
+            .extsload_1(slot_fee_growth_global0, uint!(2_U256))
+            .block(block_id)
+            .call()
+            .await?
+            .values;
+
+        let fee_growth_global0 = U256::from_be_bytes(data[0].0);
+        let fee_growth_global1 = U256::from_be_bytes(data[1].0);
+
+        Ok((fee_growth_global0, fee_growth_global1))
+    }
+
+    /// Retrieves the total liquidity of a pool
+    ///
+    /// ## Arguments
+    ///
+    /// * `pool_id`: The ID of the pool
+    /// * `block_id`: Optional block ID to query at
+    ///
+    /// ## Returns
+    ///
+    /// * `liquidity`: The liquidity of the pool
+    #[inline]
+    pub async fn get_liquidity(
+        &self,
+        pool_id: B256,
+        block_id: Option<BlockId>,
+    ) -> Result<u128, Error> {
+        let block_id = block_id.unwrap_or(BlockId::Number(BlockNumberOrTag::Latest));
+        let slot = B256::from(get_pool_state_slot(pool_id) + LIQUIDITY_OFFSET);
+        let value = self
+            .manager
+            .extsload_0(slot)
+            .block(block_id)
+            .call()
+            .await?
+            .value;
+        Ok(decode_liquidity(value))
+    }
+
+    /// Retrieves the tick bitmap of a pool at a specific tick
+    ///
+    /// ## Arguments
+    ///
+    /// * `pool_id`: The ID of the pool
+    /// * `tick`: The tick to retrieve the bitmap for
+    /// * `block_id`: Optional block ID to query at
+    #[inline]
+    pub async fn get_tick_bitmap<I: TickIndex>(
+        &self,
+        pool_id: B256,
+        tick: I,
+        block_id: Option<BlockId>,
+    ) -> Result<U256, Error> {
+        let block_id = block_id.unwrap_or(BlockId::Number(BlockNumberOrTag::Latest));
+        let slot = get_tick_bitmap_slot(pool_id, tick);
+        let word = self
+            .manager
+            .extsload_0(B256::from(slot))
+            .block(block_id)
+            .call()
+            .await?;
+        Ok(U256::from_be_bytes(word.value.0))
+    }
+
+    /// Retrieves the position information of a pool at a specific position ID
+    ///
+    /// ## Arguments
+    ///
+    /// * `pool_id`: The ID of the pool
+    /// * `position_id`: The ID of the position
+    /// * `block_id`: Optional block ID to query at
+    ///
+    /// ## Returns
+    ///
+    /// * `liquidity`: The liquidity of the position
+    /// * `fee_growth_inside0_last_x128`: The fee growth inside the position for token0
+    /// * `fee_growth_inside1_last_x128`: The fee growth inside the position for token1
+    #[inline]
+    pub async fn get_position_info(
+        &self,
+        pool_id: B256,
+        position_id: B256,
+        block_id: Option<BlockId>,
+    ) -> Result<(u128, U256, U256), Error> {
+        let block_id = block_id.unwrap_or(BlockId::Number(BlockNumberOrTag::Latest));
+        let slot = get_position_info_slot(pool_id, position_id);
+        let data = self
+            .manager
+            .extsload_1(B256::from(slot), uint!(3_U256))
+            .block(block_id)
+            .call()
+            .await?
+            .values;
+
+        let liquidity = decode_liquidity(data[0]);
+        let fee_growth_inside0_last_x128 = U256::from_be_bytes(data[1].0);
+        let fee_growth_inside1_last_x128 = U256::from_be_bytes(data[2].0);
+
+        Ok((
+            liquidity,
+            fee_growth_inside0_last_x128,
+            fee_growth_inside1_last_x128,
+        ))
+    }
+
+    /// Retrieves just the liquidity of a position
+    ///
+    /// ## Arguments
+    ///
+    /// * `pool_id`: The ID of the pool
+    /// * `position_id`: The ID of the position
+    /// * `block_id`: Optional block ID to query at
+    ///
+    /// ## Returns
+    ///
+    /// * `liquidity`: The liquidity of the position
+    #[inline]
+    pub async fn get_position_liquidity(
+        &self,
+        pool_id: B256,
+        position_id: B256,
+        block_id: Option<BlockId>,
+    ) -> Result<u128, Error> {
+        let block_id = block_id.unwrap_or(BlockId::Number(BlockNumberOrTag::Latest));
+        let slot = get_position_info_slot(pool_id, position_id);
+        let value = self
+            .manager
+            .extsload_0(B256::from(slot))
+            .block(block_id)
+            .call()
+            .await?
+            .value;
+        Ok(decode_liquidity(value))
+    }
+
+    /// Calculates the fee growth inside a tick range of a pool
+    ///
+    /// ## Arguments
+    ///
+    /// * `pool_id`: The ID of the pool
+    /// * `tick_lower`: The lower tick of the range
+    /// * `tick_upper`: The upper tick of the range
+    /// * `block_id`: Optional block ID to query at
+    ///
+    /// ## Returns
+    ///
+    /// * `fee_growth_inside0_x128`: The fee growth inside the tick range for token0
+    /// * `fee_growth_inside1_x128`: The fee growth inside the tick range for token1
+    #[inline]
+    pub async fn get_fee_growth_inside<I: TickIndex>(
+        &self,
+        pool_id: B256,
+        tick_lower: I,
+        tick_upper: I,
+        block_id: Option<BlockId>,
+    ) -> Result<(U256, U256), Error> {
+        let (fee_growth_global0_x128, fee_growth_global1_x128) =
+            self.get_fee_growth_globals(pool_id, block_id).await?;
+
+        let (lower_fee_growth_outside0_x128, lower_fee_growth_outside1_x128) = self
+            .get_tick_fee_growth_outside(pool_id, tick_lower, block_id)
+            .await?;
+
+        let (upper_fee_growth_outside0_x128, upper_fee_growth_outside1_x128) = self
+            .get_tick_fee_growth_outside(pool_id, tick_upper, block_id)
+            .await?;
+
+        let (_, tick_current, _, _) = self.get_slot0(pool_id, block_id).await?;
+
+        let (fee_growth_inside0_x128, fee_growth_inside1_x128) =
+            if tick_current < tick_lower.to_i24() {
+                (
+                    lower_fee_growth_outside0_x128 - upper_fee_growth_outside0_x128,
+                    lower_fee_growth_outside1_x128 - upper_fee_growth_outside1_x128,
+                )
+            } else if tick_current >= tick_upper.to_i24() {
+                (
+                    upper_fee_growth_outside0_x128 - lower_fee_growth_outside0_x128,
+                    upper_fee_growth_outside1_x128 - lower_fee_growth_outside1_x128,
+                )
+            } else {
+                (
+                    fee_growth_global0_x128
+                        - lower_fee_growth_outside0_x128
+                        - upper_fee_growth_outside0_x128,
+                    fee_growth_global1_x128
+                        - lower_fee_growth_outside1_x128
+                        - upper_fee_growth_outside1_x128,
+                )
+            };
+
+        Ok((fee_growth_inside0_x128, fee_growth_inside1_x128))
+    }
+}
+
+fn decode_liquidity_gross_and_net(word: B256) -> (u128, i128) {
+    // In Solidity:
+    // liquidityNet := sar(128, value)
+    // liquidityGross := and(value, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF)
+    let liquidity_gross = decode_liquidity(word);
+    let liquidity_net = unsafe {
+        // Create a pointer to the start of the first half of the array
+        let net_ptr = word.as_ptr() as *const i128;
+        // Read the value in big-endian format
+        i128::from_be(net_ptr.read_unaligned())
+    };
+    (liquidity_gross, liquidity_net)
+}
+
+fn decode_liquidity(word: B256) -> u128 {
+    unsafe {
+        // Create a pointer to the start of the second half of the array
+        let ptr = word.as_ptr().add(16) as *const u128;
+        // Read the value in big-endian format
+        u128::from_be(ptr.read_unaligned())
     }
 }
 
