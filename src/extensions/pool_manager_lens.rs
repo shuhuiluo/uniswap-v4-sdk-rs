@@ -449,24 +449,24 @@ where
     }
 }
 
-fn decode_liquidity_gross_and_net(word: B256) -> (u128, i128) {
+const fn decode_liquidity_gross_and_net(word: B256) -> (u128, i128) {
     // In Solidity:
     // liquidityNet := sar(128, value)
     // liquidityGross := and(value, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF)
     let liquidity_gross = decode_liquidity(word);
     let liquidity_net = unsafe {
         // Create a pointer to the start of the first half of the array
-        let net_ptr = word.as_ptr() as *const i128;
+        let net_ptr = word.0.as_ptr() as *const i128;
         // Read the value in big-endian format
         i128::from_be(net_ptr.read_unaligned())
     };
     (liquidity_gross, liquidity_net)
 }
 
-fn decode_liquidity(word: B256) -> u128 {
+const fn decode_liquidity(word: B256) -> u128 {
     unsafe {
         // Create a pointer to the start of the second half of the array
-        let ptr = word.as_ptr().add(16) as *const u128;
+        let ptr = word.0.as_ptr().add(16) as *const u128;
         // Read the value in big-endian format
         u128::from_be(ptr.read_unaligned())
     }
