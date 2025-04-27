@@ -475,8 +475,9 @@ fn decode_liquidity(word: B256) -> u128 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::*;
-    use alloy::providers::RootProvider;
+    use crate::{prelude::calculate_position_key, tests::*};
+    use alloy::{providers::RootProvider, rpc::types::Filter};
+    use alloy_sol_types::{sol, SolEvent};
     use once_cell::sync::Lazy;
     use uniswap_sdk_core::addresses::CHAIN_TO_ADDRESSES_MAP;
 
@@ -519,27 +520,54 @@ mod tests {
         assert_eq!(lp_fee_lens, slot0_state_view.lpFee, "lpFee mismatch");
     }
 
-    macro_rules! assert_tick_bitmap_match {
-        ($pool_id:expr, $pos:expr, $block_id:expr) => {
-            let bitmap_lens = POOL_MANAGER
-                .get_tick_bitmap($pool_id, $pos, $block_id)
+    macro_rules! assert_tick_info_match {
+        ($pool_id:expr, $tick:expr, $block_id:expr) => {
+            let (
+                liquidity_gross_lens,
+                liquidity_net_lens,
+                fee_growth_outside0_x128_lens,
+                fee_growth_outside1_x128_lens,
+            ) = POOL_MANAGER
+                .get_tick_info($pool_id, $tick, $block_id)
                 .await
                 .unwrap();
-            let bitmap_state_view = STATE_VIEW
-                .getTickBitmap($pool_id, $pos as i16)
+            let tick_info = STATE_VIEW
+                .getTickInfo($pool_id, $tick.to_i24())
                 .block($block_id.unwrap())
                 .call()
                 .await
-                .unwrap()
-                .tickBitmap;
+                .unwrap();
 
-            assert_ne!(bitmap_lens, U256::ZERO);
-            assert_eq!(bitmap_lens, bitmap_state_view);
+            assert_ne!(liquidity_gross_lens, 0);
+            assert_eq!(
+                liquidity_gross_lens, tick_info.liquidityGross,
+                "liquidityGross"
+            );
+            assert_ne!(liquidity_net_lens, 0);
+            assert_eq!(liquidity_net_lens, tick_info.liquidityNet, "liquidityNet");
+            assert_eq!(
+                fee_growth_outside0_x128_lens, tick_info.feeGrowthOutside0X128,
+                "feeGrowthOutside0X128"
+            );
+            assert_eq!(
+                fee_growth_outside1_x128_lens, tick_info.feeGrowthOutside1X128,
+                "feeGrowthOutside1X128"
+            );
         };
     }
 
+    async fn nearest_populated_tick(tick: I24) -> i32 {
+        let word = tick.as_i32().compress(TICK_SPACING).position().0;
+        let bitmap = POOL_MANAGER
+            .get_tick_bitmap(*POOL_ID_ETH_USDC, word, BLOCK_ID)
+            .await
+            .unwrap();
+        let msb = most_significant_bit(bitmap);
+        ((word << 8) + msb as i32) * TICK_SPACING
+    }
+
     #[tokio::test]
-    async fn test_get_tick_bitmap() {
+    async fn test_get_tick_info() {
         let slot0 = STATE_VIEW
             .getSlot0(*POOL_ID_ETH_USDC)
             .block(BLOCK_ID.unwrap())
@@ -547,19 +575,14 @@ mod tests {
             .await
             .unwrap();
 
-        let word = slot0.tick.as_i32().compress(TICK_SPACING).position().0;
-        for pos in word - 2..=word + 2 {
-            assert_tick_bitmap_match!(*POOL_ID_ETH_USDC, pos, BLOCK_ID);
-        }
-    }
+        let tick = nearest_populated_tick(slot0.tick).await;
+        assert_tick_info_match!(*POOL_ID_ETH_USDC, tick, BLOCK_ID);
 
-    #[tokio::test]
-    async fn test_get_tick_bitmap_edge_cases() {
-        let word = MIN_TICK_I32.compress(TICK_SPACING).position().0;
-        assert_tick_bitmap_match!(*POOL_ID_ETH_USDC, word, BLOCK_ID);
+        let tick = nearest_usable_tick(MIN_TICK_I32, TICK_SPACING);
+        assert_tick_info_match!(*POOL_ID_ETH_USDC, tick, BLOCK_ID);
 
-        let word = MAX_TICK_I32.compress(TICK_SPACING).position().0;
-        assert_tick_bitmap_match!(*POOL_ID_ETH_USDC, word, BLOCK_ID);
+        let tick = nearest_usable_tick(MAX_TICK_I32, TICK_SPACING);
+        assert_tick_info_match!(*POOL_ID_ETH_USDC, tick, BLOCK_ID);
     }
 
     macro_rules! assert_tick_liquidity_match {
@@ -597,24 +620,254 @@ mod tests {
             .await
             .unwrap();
 
-        // find the nearest populated tick
-        let word = slot0.tick.as_i32().compress(TICK_SPACING).position().0;
-        let bitmap = POOL_MANAGER
-            .get_tick_bitmap(*POOL_ID_ETH_USDC, word, BLOCK_ID)
-            .await
-            .unwrap();
-        let msb = most_significant_bit(bitmap);
-        let tick = ((word << 8) + msb as i32) * TICK_SPACING;
-
+        let tick = nearest_populated_tick(slot0.tick).await;
         assert_tick_liquidity_match!(*POOL_ID_ETH_USDC, tick, BLOCK_ID);
-    }
 
-    #[tokio::test]
-    async fn test_get_tick_liquidity_edge_cases() {
         let tick = nearest_usable_tick(MIN_TICK_I32, TICK_SPACING);
         assert_tick_liquidity_match!(*POOL_ID_ETH_USDC, tick, BLOCK_ID);
 
         let tick = nearest_usable_tick(MAX_TICK_I32, TICK_SPACING);
         assert_tick_liquidity_match!(*POOL_ID_ETH_USDC, tick, BLOCK_ID);
+    }
+
+    macro_rules! assert_fee_growth_outside_match {
+        ($pool_id:expr, $tick:expr, $block_id:expr) => {
+            let (fee_growth_outside0_x128_lens, fee_growth_outside1_x128_lens) = POOL_MANAGER
+                .get_tick_fee_growth_outside($pool_id, $tick, $block_id)
+                .await
+                .unwrap();
+            let fee_growth_outside = STATE_VIEW
+                .getTickFeeGrowthOutside($pool_id, $tick.to_i24())
+                .block($block_id.unwrap())
+                .call()
+                .await
+                .unwrap();
+
+            assert_eq!(
+                fee_growth_outside0_x128_lens, fee_growth_outside.feeGrowthOutside0X128,
+                "feeGrowthOutside0X128"
+            );
+            assert_eq!(
+                fee_growth_outside1_x128_lens, fee_growth_outside.feeGrowthOutside1X128,
+                "feeGrowthOutside1X128"
+            );
+        };
+    }
+
+    #[tokio::test]
+    async fn test_get_tick_fee_growth_outside() {
+        let slot0 = STATE_VIEW
+            .getSlot0(*POOL_ID_ETH_USDC)
+            .block(BLOCK_ID.unwrap())
+            .call()
+            .await
+            .unwrap();
+
+        let tick = nearest_populated_tick(slot0.tick).await;
+        assert_fee_growth_outside_match!(*POOL_ID_ETH_USDC, tick, BLOCK_ID);
+
+        let tick = nearest_usable_tick(MIN_TICK_I32, TICK_SPACING);
+        assert_fee_growth_outside_match!(*POOL_ID_ETH_USDC, tick, BLOCK_ID);
+
+        let tick = nearest_usable_tick(MAX_TICK_I32, TICK_SPACING);
+        assert_fee_growth_outside_match!(*POOL_ID_ETH_USDC, tick, BLOCK_ID);
+    }
+
+    #[tokio::test]
+    async fn test_get_fee_growth_globals() {
+        let (fee_growth_global0_lens, fee_growth_global1_lens) = POOL_MANAGER
+            .get_fee_growth_globals(*POOL_ID_ETH_USDC, BLOCK_ID)
+            .await
+            .unwrap();
+        let fee_growth_globals = STATE_VIEW
+            .getFeeGrowthGlobals(*POOL_ID_ETH_USDC)
+            .block(BLOCK_ID.unwrap())
+            .call()
+            .await
+            .unwrap();
+
+        assert_eq!(
+            fee_growth_global0_lens, fee_growth_globals.feeGrowthGlobal0,
+            "feeGrowthGlobal0"
+        );
+        assert_eq!(
+            fee_growth_global1_lens, fee_growth_globals.feeGrowthGlobal1,
+            "feeGrowthGlobal1"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_liquidity() {
+        let liquidity_lens = POOL_MANAGER
+            .get_liquidity(*POOL_ID_ETH_USDC, BLOCK_ID)
+            .await
+            .unwrap();
+        let liquidity = STATE_VIEW
+            .getLiquidity(*POOL_ID_ETH_USDC)
+            .block(BLOCK_ID.unwrap())
+            .call()
+            .await
+            .unwrap();
+
+        assert_eq!(liquidity_lens, liquidity.liquidity);
+    }
+
+    macro_rules! assert_tick_bitmap_match {
+        ($pool_id:expr, $pos:expr, $block_id:expr) => {
+            let bitmap_lens = POOL_MANAGER
+                .get_tick_bitmap($pool_id, $pos, $block_id)
+                .await
+                .unwrap();
+            let bitmap_state_view = STATE_VIEW
+                .getTickBitmap($pool_id, $pos as i16)
+                .block($block_id.unwrap())
+                .call()
+                .await
+                .unwrap()
+                .tickBitmap;
+
+            assert_ne!(bitmap_lens, U256::ZERO);
+            assert_eq!(bitmap_lens, bitmap_state_view);
+        };
+    }
+
+    #[tokio::test]
+    async fn test_get_tick_bitmap() {
+        let slot0 = STATE_VIEW
+            .getSlot0(*POOL_ID_ETH_USDC)
+            .block(BLOCK_ID.unwrap())
+            .call()
+            .await
+            .unwrap();
+
+        let word = slot0.tick.as_i32().compress(TICK_SPACING).position().0;
+        for pos in word - 2..=word + 2 {
+            assert_tick_bitmap_match!(*POOL_ID_ETH_USDC, pos, BLOCK_ID);
+        }
+
+        let word = MIN_TICK_I32.compress(TICK_SPACING).position().0;
+        assert_tick_bitmap_match!(*POOL_ID_ETH_USDC, word, BLOCK_ID);
+
+        let word = MAX_TICK_I32.compress(TICK_SPACING).position().0;
+        assert_tick_bitmap_match!(*POOL_ID_ETH_USDC, word, BLOCK_ID);
+    }
+
+    async fn get_position_ids() -> Vec<B256> {
+        sol! {
+            type PoolId is bytes32;
+
+            event ModifyLiquidity(
+                PoolId indexed id, address indexed sender, int24 tickLower, int24 tickUpper, int256 liquidityDelta, bytes32 salt
+            );
+        }
+
+        // create a filter to get `ModifyLiquidity` events for a specific pool ID
+        let filter = Filter::new()
+            .from_block(BLOCK_ID.unwrap().as_u64().unwrap() - 10000)
+            .to_block(BLOCK_ID.unwrap().as_u64().unwrap())
+            .event_signature(ModifyLiquidity::SIGNATURE_HASH)
+            .address(*POOL_MANAGER.manager.address())
+            .topic1(*POOL_ID_ETH_USDC);
+        let logs = PROVIDER.get_logs(&filter).await.unwrap();
+        logs.iter()
+            .map(|log| ModifyLiquidity::decode_log_data(log.data(), true).unwrap())
+            .filter(|event| event.liquidityDelta.is_positive())
+            .map(
+                |ModifyLiquidity {
+                     sender,
+                     tickLower,
+                     tickUpper,
+                     salt,
+                     ..
+                 }| calculate_position_key(sender, tickLower, tickUpper, salt),
+            )
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn test_get_position_info() {
+        let position_ids = get_position_ids().await;
+        assert!(!position_ids.is_empty());
+
+        for &position_id in &position_ids[..4] {
+            let (
+                liquidity_lens,
+                fee_growth_inside0_last_x128_lens,
+                fee_growth_inside1_last_x128_lens,
+            ) = POOL_MANAGER
+                .get_position_info(*POOL_ID_ETH_USDC, position_id, BLOCK_ID)
+                .await
+                .unwrap();
+            let position_info = STATE_VIEW
+                .getPositionInfo_1(*POOL_ID_ETH_USDC, position_id)
+                .block(BLOCK_ID.unwrap())
+                .call()
+                .await
+                .unwrap();
+
+            assert_eq!(liquidity_lens, position_info.liquidity);
+            assert_eq!(
+                fee_growth_inside0_last_x128_lens, position_info.feeGrowthInside0LastX128,
+                "feeGrowthInside0LastX128"
+            );
+            assert_eq!(
+                fee_growth_inside1_last_x128_lens, position_info.feeGrowthInside1LastX128,
+                "feeGrowthInside1LastX128"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_position_liquidity() {
+        let position_ids = get_position_ids().await;
+        assert!(!position_ids.is_empty());
+
+        for &position_id in &position_ids[..4] {
+            let liquidity_lens = POOL_MANAGER
+                .get_position_liquidity(*POOL_ID_ETH_USDC, position_id, BLOCK_ID)
+                .await
+                .unwrap();
+            let liquidity = STATE_VIEW
+                .getPositionLiquidity(*POOL_ID_ETH_USDC, position_id)
+                .block(BLOCK_ID.unwrap())
+                .call()
+                .await
+                .unwrap();
+
+            assert_eq!(liquidity_lens, liquidity.liquidity);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_fee_growth_inside() {
+        let slot0 = STATE_VIEW
+            .getSlot0(*POOL_ID_ETH_USDC)
+            .block(BLOCK_ID.unwrap())
+            .call()
+            .await
+            .unwrap();
+
+        let tick = nearest_populated_tick(slot0.tick).await;
+        let tick_lower = tick - TICK_SPACING;
+        let tick_upper = tick + TICK_SPACING;
+        let (fee_growth_inside0_lens, fee_growth_inside1_lens) = POOL_MANAGER
+            .get_fee_growth_inside(*POOL_ID_ETH_USDC, tick_lower, tick_upper, BLOCK_ID)
+            .await
+            .unwrap();
+        let fee_growth_inside = STATE_VIEW
+            .getFeeGrowthInside(*POOL_ID_ETH_USDC, tick_lower.to_i24(), tick_upper.to_i24())
+            .block(BLOCK_ID.unwrap())
+            .call()
+            .await
+            .unwrap();
+
+        assert_eq!(
+            fee_growth_inside0_lens, fee_growth_inside.feeGrowthInside0X128,
+            "feeGrowthInside0X128"
+        );
+        assert_eq!(
+            fee_growth_inside1_lens, fee_growth_inside.feeGrowthInside1X128,
+            "feeGrowthInside1X128"
+        );
     }
 }

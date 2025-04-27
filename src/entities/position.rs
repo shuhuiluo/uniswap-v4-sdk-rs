@@ -1,6 +1,10 @@
 use crate::prelude::{tick_to_price, Error, Pool, *};
 use alloc::vec;
-use alloy_primitives::{aliases::U48, uint, U160, U256};
+use alloy_primitives::{
+    aliases::{I24, U48},
+    keccak256, uint, U160, U256,
+};
+use alloy_sol_types::SolValue;
 use num_traits::ToPrimitive;
 use uniswap_sdk_core::prelude::*;
 use uniswap_v3_sdk::prelude::*;
@@ -539,4 +543,16 @@ impl<TP: TickDataProvider> Position<TP> {
         // this function always uses full precision
         Self::from_amounts(pool, tick_lower, tick_upper, U256::MAX, amount1, true)
     }
+}
+
+/// Computes the position key for a given position
+#[inline]
+#[must_use]
+pub fn calculate_position_key(
+    owner: Address,
+    tick_lower: I24,
+    tick_upper: I24,
+    salt: B256,
+) -> B256 {
+    keccak256((owner, tick_lower, tick_upper, salt).abi_encode_packed())
 }
