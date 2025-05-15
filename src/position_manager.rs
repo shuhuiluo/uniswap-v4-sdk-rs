@@ -1,6 +1,6 @@
 use crate::prelude::{Error, *};
 use alloc::vec::Vec;
-use alloy_primitives::{address, Address, Bytes, PrimitiveSignature, U160, U256};
+use alloy_primitives::{address, Address, Bytes, Signature, U160, U256};
 use alloy_sol_types::{eip712_domain, SolCall};
 use derive_more::{Deref, DerefMut};
 use num_traits::ToPrimitive;
@@ -116,7 +116,7 @@ pub struct NFTPermitOptions {
     #[deref]
     #[deref_mut]
     pub values: NFTPermitValues,
-    pub signature: PrimitiveSignature,
+    pub signature: Signature,
 }
 
 /// Public methods to encode method parameters for different actions on the PositionManager contract
@@ -454,7 +454,7 @@ pub fn encode_erc721_permit(
 ///
 /// ```
 /// use alloy::signers::{local::PrivateKeySigner, SignerSync};
-/// use alloy_primitives::{address, b256, uint, PrimitiveSignature, B256};
+/// use alloy_primitives::{address, b256, uint, Signature, B256};
 /// use alloy_sol_types::SolStruct;
 /// use uniswap_v4_sdk::prelude::*;
 ///
@@ -478,7 +478,7 @@ pub fn encode_erc721_permit(
 /// let hash: B256 = data.eip712_signing_hash();
 ///
 /// let signer = PrivateKeySigner::random();
-/// let signature: PrimitiveSignature = signer.sign_hash_sync(&hash).unwrap();
+/// let signature: Signature = signer.sign_hash_sync(&hash).unwrap();
 /// assert_eq!(
 ///     signature.recover_address_from_prehash(&hash).unwrap(),
 ///     signer.address()

@@ -150,7 +150,7 @@ mod extensions {
     pub(crate) static PROVIDER: Lazy<RootProvider> = Lazy::new(|| {
         ProviderBuilder::new()
             .disable_recommended_fillers()
-            .on_http(RPC_URL.clone())
+            .connect_http(RPC_URL.clone())
     });
 
     pub(crate) const BLOCK_ID: Option<BlockId> =
@@ -167,7 +167,7 @@ mod extensions {
         .unwrap()
     });
 
-    pub(crate) static STATE_VIEW: Lazy<IStateView::IStateViewInstance<(), RootProvider>> =
+    pub(crate) static STATE_VIEW: Lazy<IStateView::IStateViewInstance<RootProvider>> =
         Lazy::new(|| {
             IStateView::new(
                 CHAIN_TO_ADDRESSES_MAP

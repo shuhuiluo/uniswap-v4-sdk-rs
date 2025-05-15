@@ -47,6 +47,6 @@ pub enum Error {
 pub fn map_contract_error(e: Error) -> V3Error {
     match e {
         Error::ContractError(contract_error) => V3Error::ContractError(contract_error),
-        _ => panic!("Unexpected error: {:?}", e),
+        _ => panic!("Unexpected error: {e:?}"),
     }
 }

@@ -76,23 +76,25 @@ impl Actions {
     pub fn abi_decode(command: u8, data: &Bytes) -> Result<Self, Error> {
         let data = data.iter().as_slice();
         Ok(match command {
-            0x00 => Self::INCREASE_LIQUIDITY(IncreaseLiquidityParams::abi_decode(data, true)?),
-            0x01 => Self::DECREASE_LIQUIDITY(DecreaseLiquidityParams::abi_decode(data, true)?),
-            0x02 => Self::MINT_POSITION(MintPositionParams::abi_decode(data, true)?),
-            0x03 => Self::BURN_POSITION(BurnPositionParams::abi_decode(data, true)?),
-            0x06 => Self::SWAP_EXACT_IN_SINGLE(SwapExactInSingleParams::abi_decode(data, true)?),
-            0x07 => Self::SWAP_EXACT_IN(SwapExactInParams::abi_decode(data, true)?),
-            0x08 => Self::SWAP_EXACT_OUT_SINGLE(SwapExactOutSingleParams::abi_decode(data, true)?),
-            0x09 => Self::SWAP_EXACT_OUT(SwapExactOutParams::abi_decode(data, true)?),
-            0x0b => Self::SETTLE(SettleParams::abi_decode(data, true)?),
-            0x0c => Self::SETTLE_ALL(SettleAllParams::abi_decode(data, true)?),
-            0x0d => Self::SETTLE_PAIR(SettlePairParams::abi_decode(data, true)?),
-            0x0e => Self::TAKE(TakeParams::abi_decode(data, true)?),
-            0x0f => Self::TAKE_ALL(TakeAllParams::abi_decode(data, true)?),
-            0x10 => Self::TAKE_PORTION(TakePortionParams::abi_decode(data, true)?),
-            0x11 => Self::TAKE_PAIR(TakePairParams::abi_decode(data, true)?),
-            0x12 => Self::CLOSE_CURRENCY(CloseCurrencyParams::abi_decode(data, true)?),
-            0x14 => Self::SWEEP(SweepParams::abi_decode(data, true)?),
+            0x00 => Self::INCREASE_LIQUIDITY(IncreaseLiquidityParams::abi_decode_validate(data)?),
+            0x01 => Self::DECREASE_LIQUIDITY(DecreaseLiquidityParams::abi_decode_validate(data)?),
+            0x02 => Self::MINT_POSITION(MintPositionParams::abi_decode_validate(data)?),
+            0x03 => Self::BURN_POSITION(BurnPositionParams::abi_decode_validate(data)?),
+            0x06 => Self::SWAP_EXACT_IN_SINGLE(SwapExactInSingleParams::abi_decode_validate(data)?),
+            0x07 => Self::SWAP_EXACT_IN(SwapExactInParams::abi_decode_validate(data)?),
+            0x08 => {
+                Self::SWAP_EXACT_OUT_SINGLE(SwapExactOutSingleParams::abi_decode_validate(data)?)
+            }
+            0x09 => Self::SWAP_EXACT_OUT(SwapExactOutParams::abi_decode_validate(data)?),
+            0x0b => Self::SETTLE(SettleParams::abi_decode_validate(data)?),
+            0x0c => Self::SETTLE_ALL(SettleAllParams::abi_decode_validate(data)?),
+            0x0d => Self::SETTLE_PAIR(SettlePairParams::abi_decode_validate(data)?),
+            0x0e => Self::TAKE(TakeParams::abi_decode_validate(data)?),
+            0x0f => Self::TAKE_ALL(TakeAllParams::abi_decode_validate(data)?),
+            0x10 => Self::TAKE_PORTION(TakePortionParams::abi_decode_validate(data)?),
+            0x11 => Self::TAKE_PAIR(TakePairParams::abi_decode_validate(data)?),
+            0x12 => Self::CLOSE_CURRENCY(CloseCurrencyParams::abi_decode_validate(data)?),
+            0x14 => Self::SWEEP(SweepParams::abi_decode_validate(data)?),
             _ => return Err(Error::InvalidAction(command)),
         })
     }

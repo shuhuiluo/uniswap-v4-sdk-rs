@@ -54,7 +54,7 @@ where
     N: Network,
     P: Provider<N>,
 {
-    pub manager: IExtsload::IExtsloadInstance<(), P, N>,
+    pub manager: IExtsload::IExtsloadInstance<P, N>,
     _network: core::marker::PhantomData<N>,
 }
 
@@ -98,8 +98,7 @@ where
             .extsload_0(B256::from(state_slot))
             .block(block_id)
             .call()
-            .await?
-            .value;
+            .await?;
 
         let sqrt_price_x96 = U160::from_be_slice(&data[12..32]);
 
@@ -147,8 +146,7 @@ where
             .extsload_1(B256::from(slot), uint!(3_U256))
             .block(block_id)
             .call()
-            .await?
-            .values;
+            .await?;
 
         let (liquidity_gross, liquidity_net) = decode_liquidity_gross_and_net(data[0]);
         let fee_growth_outside0_x128 = U256::from_be_bytes(data[1].0);
@@ -189,8 +187,7 @@ where
             .extsload_0(B256::from(slot))
             .block(block_id)
             .call()
-            .await?
-            .value;
+            .await?;
         Ok(decode_liquidity_gross_and_net(value))
     }
 
@@ -222,8 +219,7 @@ where
             .extsload_1(slot, uint!(2_U256))
             .block(block_id)
             .call()
-            .await?
-            .values;
+            .await?;
 
         let fee_growth_outside0_x128 = U256::from_be_bytes(data[0].0);
         let fee_growth_outside1_x128 = U256::from_be_bytes(data[1].0);
@@ -256,8 +252,7 @@ where
             .extsload_1(slot_fee_growth_global0, uint!(2_U256))
             .block(block_id)
             .call()
-            .await?
-            .values;
+            .await?;
 
         let fee_growth_global0 = U256::from_be_bytes(data[0].0);
         let fee_growth_global1 = U256::from_be_bytes(data[1].0);
@@ -283,13 +278,7 @@ where
     ) -> Result<u128, Error> {
         let block_id = block_id.unwrap_or(BlockId::Number(BlockNumberOrTag::Latest));
         let slot = B256::from(get_pool_state_slot(pool_id) + LIQUIDITY_OFFSET);
-        let value = self
-            .manager
-            .extsload_0(slot)
-            .block(block_id)
-            .call()
-            .await?
-            .value;
+        let value = self.manager.extsload_0(slot).block(block_id).call().await?;
         Ok(decode_liquidity(value))
     }
 
@@ -315,7 +304,7 @@ where
             .block(block_id)
             .call()
             .await?;
-        Ok(U256::from_be_bytes(word.value.0))
+        Ok(U256::from_be_bytes(word.0))
     }
 
     /// Retrieves the position information of a pool at a specific position ID
@@ -345,8 +334,7 @@ where
             .extsload_1(B256::from(slot), uint!(3_U256))
             .block(block_id)
             .call()
-            .await?
-            .values;
+            .await?;
 
         let liquidity = decode_liquidity(data[0]);
         let fee_growth_inside0_last_x128 = U256::from_be_bytes(data[1].0);
@@ -384,8 +372,7 @@ where
             .extsload_0(B256::from(slot))
             .block(block_id)
             .call()
-            .await?
-            .value;
+            .await?;
         Ok(decode_liquidity(value))
     }
 
@@ -709,7 +696,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(liquidity_lens, liquidity.liquidity);
+        assert_eq!(liquidity_lens, liquidity);
     }
 
     macro_rules! assert_tick_bitmap_match {
@@ -723,8 +710,7 @@ mod tests {
                 .block($block_id.unwrap())
                 .call()
                 .await
-                .unwrap()
-                .tickBitmap;
+                .unwrap();
 
             assert_ne!(bitmap_lens, U256::ZERO);
             assert_eq!(bitmap_lens, bitmap_state_view);
@@ -763,14 +749,14 @@ mod tests {
 
         // create a filter to get `ModifyLiquidity` events for a specific pool ID
         let filter = Filter::new()
-            .from_block(BLOCK_ID.unwrap().as_u64().unwrap() - 10000)
+            .from_block(BLOCK_ID.unwrap().as_u64().unwrap() - 499)
             .to_block(BLOCK_ID.unwrap().as_u64().unwrap())
             .event_signature(ModifyLiquidity::SIGNATURE_HASH)
             .address(*POOL_MANAGER.manager.address())
             .topic1(*POOL_ID_ETH_USDC);
         let logs = PROVIDER.get_logs(&filter).await.unwrap();
         logs.iter()
-            .map(|log| ModifyLiquidity::decode_log_data(log.data(), true).unwrap())
+            .map(|log| ModifyLiquidity::decode_log_data(log.data()).unwrap())
             .filter(|event| event.liquidityDelta.is_positive())
             .map(
                 |ModifyLiquidity {
@@ -789,7 +775,7 @@ mod tests {
         let position_ids = get_position_ids().await;
         assert!(!position_ids.is_empty());
 
-        for &position_id in &position_ids[..4] {
+        for position_id in position_ids {
             let (
                 liquidity_lens,
                 fee_growth_inside0_last_x128_lens,
@@ -822,7 +808,7 @@ mod tests {
         let position_ids = get_position_ids().await;
         assert!(!position_ids.is_empty());
 
-        for &position_id in &position_ids[..4] {
+        for position_id in position_ids {
             let liquidity_lens = POOL_MANAGER
                 .get_position_liquidity(*POOL_ID_ETH_USDC, position_id, BLOCK_ID)
                 .await
@@ -834,7 +820,7 @@ mod tests {
                 .await
                 .unwrap();
 
-            assert_eq!(liquidity_lens, liquidity.liquidity);
+            assert_eq!(liquidity_lens, liquidity);
         }
     }
 
