@@ -204,6 +204,123 @@ impl<TP: TickDataProvider> Position<TP> {
         (sqrt_ratio_x96_lower, sqrt_ratio_x96_upper)
     }
 
+    //   /**
+    //    * Calculates the adjusted amounts and adjusted liquidity for the position given the
+    //      slippage tolerance.
+    //    * The function:
+    //    * 1. Adjusts the liquidity based on the slippage tolerance
+    //    * 2. Creates a new position with the adjusted liquidity
+    //    * 3. Calculates the mint amounts for the adjusted position
+    //    *
+    //    * @param slippageTolerance The maximum acceptable slippage as a percentage
+    //    * @returns An object containing:
+    //    * - amount0: The adjusted amount of token0
+    //    * - amount1: The adjusted amount of token1
+    //    * - liquidity: The adjusted liquidity value
+    //    */
+    //
+    //   public maxAmountsAndLiquidityWithSlippage(
+    //     slippageTolerance: Percent
+    //   ): Readonly<{ amount0: JSBI; amount1: JSBI; liquidity: JSBI }> {
+    //     const adjustedLiquidity = this.getAdjustedLiquidityForSlippage(slippageTolerance)
+    //     const position = new Position({
+    //       pool: this.pool,
+    //       liquidity: adjustedLiquidity,
+    //       tickLower: this.tickLower,
+    //       tickUpper: this.tickUpper,
+    //     })
+    //     const { amount0, amount1 } = position.mintAmountsWithSlippage(slippageTolerance)
+    //     return { amount0, amount1, liquidity: adjustedLiquidity }
+    //   }
+    //
+    //   /**
+    //    * Calculates the adjusted liquidity for a position given a slippage tolerance.
+    //    * The function:
+    //    * 1. Gets the upper and lower price bounds after slippage
+    //    * 2. Creates two counterfactual pools at these price bounds
+    //    * 3. Calculates the liquidity that would be obtained at each price bound
+    //    * 4. Returns the minimum liquidity to ensure the position can be created at either price
+    //      bound
+    //    *
+    //    * @param slippageTolerance The maximum acceptable slippage as a percentage
+    //    * @returns The adjusted liquidity value that ensures the position can be created even with
+    //      slippage
+    //    */
+    //   private getAdjustedLiquidityForSlippage(slippageTolerance: Percent): JSBI {
+    //     const { sqrtRatioX96Upper, sqrtRatioX96Lower } =
+    // this.ratiosAfterSlippage(slippageTolerance)     // construct counterfactual pools from
+    // the lower bounded price and the upper bounded price     const poolLower = new Pool(
+    //       this.pool.token0,
+    //       this.pool.token1,
+    //       this.pool.fee,
+    //       this.pool.tickSpacing,
+    //       this.pool.hooks,
+    //       sqrtRatioX96Lower,
+    //       0 /* liquidity doesn't matter */,
+    //       TickMath.getTickAtSqrtRatio(sqrtRatioX96Lower)
+    //     )
+    //     const poolUpper = new Pool(
+    //       this.pool.token0,
+    //       this.pool.token1,
+    //       this.pool.fee,
+    //       this.pool.tickSpacing,
+    //       this.pool.hooks,
+    //       sqrtRatioX96Upper,
+    //       0 /* liquidity doesn't matter */,
+    //       TickMath.getTickAtSqrtRatio(sqrtRatioX96Upper)
+    //     )
+    //
+    //     const { amount0, amount1 } = this.mintAmounts
+    //     const positionUpper = Position.fromAmounts({
+    //       pool: poolUpper,
+    //       tickLower: this.tickLower,
+    //       tickUpper: this.tickUpper,
+    //       amount0,
+    //       amount1,
+    //       useFullPrecision: true,
+    //     })
+    //     const liquidityUpper = positionUpper.liquidity
+    //
+    //     const positionLower = Position.fromAmounts({
+    //       pool: poolLower,
+    //       tickLower: this.tickLower,
+    //       tickUpper: this.tickUpper,
+    //       amount0,
+    //       amount1,
+    //       useFullPrecision: true,
+    //     })
+    //     const liquidityLower = positionLower.liquidity
+    //
+    //     if (JSBI.lessThanOrEqual(liquidityUpper, liquidityLower)) {
+    //       return liquidityUpper
+    //     } else {
+    //       return liquidityLower
+    //     }
+    //   }
+    //
+    //   /**
+    //    * Returns the maximum amount of token0 and token1 that must be sent in order to safely
+    //      mint the amount of liquidity held by the position
+    //    * with the given slippage tolerance
+    //    * @param slippageTolerance Tolerance of unfavorable slippage from the current price
+    //    * @returns The amounts, with slippage
+    //    * @dev In v4, minting and increasing is protected by maximum amounts of token0 and token1.
+    //    */
+    //   public getMintAmountsWithSlippage(slippageTolerance: Percent): Readonly<{ amount0: JSBI;
+    // amount1: JSBI }> {     return this.mintAmountsWithSlippage(slippageTolerance)
+    //   }
+    //
+    //   /**
+    //    * Internal helper method that calculates the maximum amounts of token0 and token1 needed
+    //      for minting
+    //    * with slippage protection. This is used by the public getMintAmountsWithSlippage method.
+    //    * @param slippageTolerance Tolerance of unfavorable slippage from the current price
+    //    * @returns The amounts, with slippage
+    //    * @dev In v4, minting and increasing is protected by maximum amounts of token0 and token1.
+    //    */
+    //   private mintAmountsWithSlippage(slippageTolerance: Percent): Readonly<{ amount0: JSBI;
+    // amount1: JSBI }> {
+
     /// Returns the maximum amounts that must be sent in order to safely mint the amount of
     /// liquidity held by the position
     ///
@@ -219,7 +336,7 @@ impl<TP: TickDataProvider> Position<TP> {
     ///
     /// The amounts, with slippage
     #[inline]
-    pub fn mint_amounts_with_slippage(
+    fn mint_amounts_with_slippage(
         &mut self,
         slippage_tolerance: &Percent,
     ) -> Result<MintAmounts, Error> {
@@ -555,4 +672,327 @@ pub fn calculate_position_key(
     salt: B256,
 ) -> B256 {
     keccak256((owner, tick_lower, tick_upper, salt).abi_encode_packed())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use once_cell::sync::Lazy;
+    use uniswap_sdk_core::token;
+
+    static CURRENCY0: Lazy<Token> = Lazy::new(|| {
+        token!(
+            1,
+            "0x0000000000000000000000000000000000000001",
+            18,
+            "t0",
+            "currency0"
+        )
+    });
+    static CURRENCY1: Lazy<Token> = Lazy::new(|| {
+        token!(
+            1,
+            "0x0000000000000000000000000000000000000002",
+            18,
+            "t1",
+            "currency1"
+        )
+    });
+    const FEE: FeeAmount = FeeAmount::MEDIUM;
+    static POOL_0_1: Lazy<Pool> = Lazy::new(|| {
+        Pool::new(
+            CURRENCY0.clone().into(),
+            CURRENCY1.clone().into(),
+            FEE.into(),
+            FEE.tick_spacing().as_i32(),
+            Address::ZERO,
+            encode_sqrt_ratio_x96(1, 1),
+            0,
+        )
+        .unwrap()
+    });
+    static SLIPPAGE_TOLERANCE: Lazy<Percent> = Lazy::new(|| Percent::new(1, 100));
+
+    mod bounds_maximum_amounts {
+        use super::*;
+
+        #[tokio::test]
+        async fn in_range() {
+            let mut position = Position::new(
+                POOL_0_1.clone(),
+                100_000_000_000_000_000_000u128, // 100e18
+                -180,
+                180,
+            );
+
+            let MintAmounts {
+                amount0: initialized_amount0,
+                amount1: initialized_amount1,
+            } = position.mint_amounts().unwrap();
+
+            let MintAmounts {
+                amount0: adjusted_amount0,
+                amount1: adjusted_amount1,
+            } = position
+                .mint_amounts_with_slippage(&SLIPPAGE_TOLERANCE)
+                .unwrap();
+
+            assert!(
+                adjusted_amount0 <= initialized_amount0,
+                "adjusted amount0 should be <= initialized amount0"
+            );
+            assert!(
+                adjusted_amount1 <= initialized_amount1,
+                "adjusted amount1 should be <= initialized amount1"
+            );
+            assert!(
+                adjusted_amount0 == initialized_amount0 || adjusted_amount1 == initialized_amount1,
+                "at least one of the adjusted amounts should equal
+    initialized amount"
+            );
+        }
+
+        #[tokio::test]
+        async fn below_range() {
+            let position = Position::new(
+                pool_0_1.clone(),
+                100_000_000_000_000_000_000u128, // 100e18
+                -180,
+                -60,
+            );
+
+            let mint_amounts = position.mint_amounts().unwrap();
+            let initialized_amount0 = mint_amounts.amount0;
+            let initialized_amount1 = mint_amounts.amount1;
+
+            let slippage_amounts = position
+                .mint_amounts_with_slippage(&slippage_tolerance)
+                .unwrap();
+            let adjusted_amount0 = slippage_amounts.amount0;
+            let adjusted_amount1 = slippage_amounts.amount1;
+
+            assert!(
+                adjusted_amount0 <= initialized_amount0,
+                "adjusted amount0 should be <= initialized amount0"
+            );
+            assert!(
+                adjusted_amount1 <= initialized_amount1,
+                "adjusted amount1 should be <= initialized amount1"
+            );
+            assert!(
+                adjusted_amount0 == initialized_amount0 || adjusted_amount1 == initialized_amount1,
+                "at least one of the adjusted amounts should equal
+    initialized amount"
+            );
+        }
+
+        #[tokio::test]
+        async fn above_range() {
+            let position = Position::new(
+                pool_0_1,
+                100_000_000_000_000_000_000u128, // 100e18
+                60,
+                180,
+            );
+
+            let mint_amounts = position.mint_amounts().unwrap();
+            let initialized_amount0 = mint_amounts.amount0;
+            let initialized_amount1 = mint_amounts.amount1;
+
+            let slippage_amounts = position
+                .mint_amounts_with_slippage(&slippage_tolerance)
+                .unwrap();
+            let adjusted_amount0 = slippage_amounts.amount0;
+            let adjusted_amount1 = slippage_amounts.amount1;
+
+            assert!(
+                adjusted_amount0 <= initialized_amount0,
+                "adjusted amount0 should be <= initialized amount0"
+            );
+            assert!(
+                adjusted_amount1 <= initialized_amount1,
+                "adjusted amount1 should be <= initialized amount1"
+            );
+            assert!(
+                adjusted_amount0 == initialized_amount0 || adjusted_amount1 == initialized_amount1,
+                "at least one of the adjusted amounts should equal
+    initialized amount"
+            );
+        }
+    }
+
+    // #[tokio::test]
+    // async fn test_mint_amounts() {
+    //     // Setup tokens similar to the TypeScript tests
+    //     let usdc = Token::new(
+    //         1,
+    //         "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+    //             .parse()
+    //             .unwrap(),
+    //         6,
+    //         "USDC",
+    //         "USD Coin",
+    //     );
+    //     let dai = Token::new(
+    //         1,
+    //         "0x6B175474E89094C44Da98b954EedeAC495271d0F"
+    //             .parse()
+    //             .unwrap(),
+    //         18,
+    //         "DAI",
+    //         "DAI Stablecoin",
+    //     );
+    //
+    //     let pool_sqrt_ratio_start = encode_sqrt_ratio_x96(
+    //         U256::from_dec_str("100000000").unwrap(), // 100e6
+    //         U256::from_dec_str("100000000000000000000").unwrap(), // 100e18
+    //     );
+    //
+    //     let pool_tick_current = get_tick_at_sqrt_ratio(pool_sqrt_ratio_start).unwrap();
+    //     let tick_spacing = 10; // TICK_SPACING_TEN
+    //
+    //     let dai_usdc_pool = Pool::new(
+    //         dai.clone(),
+    //         usdc.clone(),
+    //         500,
+    //         tick_spacing,
+    //         ADDRESS_ZERO,
+    //         pool_sqrt_ratio_start,
+    //         0,
+    //         pool_tick_current.into(),
+    //         vec![],
+    //     )
+    //     .unwrap();
+    //
+    //     // 0 slippage tolerance
+    //     let slippage_tolerance = Percent::new(0, 1);
+    //
+    //     // Test positions below
+    //     {
+    //         let tick_lower =
+    //             nearest_usable_tick(pool_tick_current.into(), tick_spacing.into()) +
+    // tick_spacing;         let tick_upper = nearest_usable_tick(pool_tick_current.into(),
+    // tick_spacing.into())
+    //             + tick_spacing * 2;
+    //
+    //         let amount0 = U256::from_dec_str("49949961958869841738198").unwrap();
+    //         let amount1 = U256::ZERO;
+    //
+    //         let liquidity = max_liquidity_for_amounts(
+    //             dai_usdc_pool.sqrt_price_x96,
+    //             get_sqrt_ratio_at_tick(tick_lower).unwrap(),
+    //             get_sqrt_ratio_at_tick(tick_upper).unwrap(),
+    //             amount0,
+    //             amount1,
+    //             true,
+    //         );
+    //
+    //         let position = Position::new(
+    //             dai_usdc_pool.clone(),
+    //             liquidity.to_u128().unwrap(),
+    //             tick_lower,
+    //             tick_upper,
+    //         );
+    //
+    //         let mint_amounts = position
+    //             .mint_amounts_with_slippage(&slippage_tolerance)
+    //             .unwrap();
+    //
+    //         assert_eq!(
+    //             mint_amounts.amount0.to_string(),
+    //             "49949961958869841738198",
+    //             "amount0 should match expected value"
+    //         );
+    //         assert_eq!(
+    //             mint_amounts.amount1.to_string(),
+    //             "0",
+    //             "amount1 should match expected value"
+    //         );
+    //     }
+    //
+    //     // Test positions above
+    //     {
+    //         let tick_lower = nearest_usable_tick(pool_tick_current.into(), tick_spacing.into())
+    //             - tick_spacing * 2;
+    //         let tick_upper =
+    //             nearest_usable_tick(pool_tick_current.into(), tick_spacing.into()) -
+    // tick_spacing;
+    //
+    //         let amount0 = U256::ZERO;
+    //         let amount1 = U256::from_dec_str("49970077053").unwrap();
+    //
+    //         let liquidity = max_liquidity_for_amounts(
+    //             dai_usdc_pool.sqrt_price_x96,
+    //             get_sqrt_ratio_at_tick(tick_lower).unwrap(),
+    //             get_sqrt_ratio_at_tick(tick_upper).unwrap(),
+    //             amount0,
+    //             amount1,
+    //             true,
+    //         );
+    //
+    //         let position = Position::new(
+    //             dai_usdc_pool.clone(),
+    //             liquidity.to_u128().unwrap(),
+    //             tick_lower,
+    //             tick_upper,
+    //         );
+    //
+    //         let mint_amounts = position
+    //             .mint_amounts_with_slippage(&slippage_tolerance)
+    //             .unwrap();
+    //
+    //         assert_eq!(
+    //             mint_amounts.amount0.to_string(),
+    //             "0",
+    //             "amount0 should match expected value"
+    //         );
+    //         assert_eq!(
+    //             mint_amounts.amount1.to_string(),
+    //             "49970077053",
+    //             "amount1 should match expected value"
+    //         );
+    //     }
+    //
+    //     // Test positions within
+    //     {
+    //         let tick_lower = nearest_usable_tick(pool_tick_current.into(), tick_spacing.into())
+    //             - tick_spacing * 2;
+    //         let tick_upper = nearest_usable_tick(pool_tick_current.into(), tick_spacing.into())
+    //             + tick_spacing * 2;
+    //
+    //         let amount0 = U256::from_dec_str("120054069145287995740584").unwrap();
+    //         let amount1 = U256::from_dec_str("79831926243").unwrap();
+    //
+    //         let liquidity = max_liquidity_for_amounts(
+    //             dai_usdc_pool.sqrt_price_x96,
+    //             get_sqrt_ratio_at_tick(tick_lower).unwrap(),
+    //             get_sqrt_ratio_at_tick(tick_upper).unwrap(),
+    //             amount0,
+    //             amount1,
+    //             true,
+    //         );
+    //
+    //         let position = Position::new(
+    //             dai_usdc_pool.clone(),
+    //             liquidity.to_u128().unwrap(),
+    //             tick_lower,
+    //             tick_upper,
+    //         );
+    //
+    //         let mint_amounts = position
+    //             .mint_amounts_with_slippage(&slippage_tolerance)
+    //             .unwrap();
+    //
+    //         assert_eq!(
+    //             mint_amounts.amount0.to_string(),
+    //             "120054069145287995740584",
+    //             "amount0 should match expected value"
+    //         );
+    //         assert_eq!(
+    //             mint_amounts.amount1.to_string(),
+    //             "79831926243",
+    //             "amount1 should match expected value"
+    //         );
+    //     }
+    // }
 }
