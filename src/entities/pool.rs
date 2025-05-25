@@ -212,6 +212,7 @@ impl<TP: TickDataProvider> Pool<TP> {
     }
 
     /// v4-only involvesToken convenience method, used for mixed route ETH <-> WETH connection only
+    #[inline]
     pub fn v4_involves_token(&self, currency: &impl BaseCurrency) -> bool {
         if self.involves_currency(currency) {
             return true;
