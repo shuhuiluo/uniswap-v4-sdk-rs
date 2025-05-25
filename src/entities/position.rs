@@ -248,26 +248,6 @@ impl<TP: TickDataProvider> Position<TP> {
             0, // liquidity doesn't matter
         )?;
 
-        // because the router is imprecise, we need to calculate the position (assuming no slippage)
-        // to get the estimated actual liquidity
-        let MintAmounts { amount0, amount1 } = self.mint_amounts_cached()?;
-        let position_without_slippage = Position::from_amounts(
-            Pool::new(
-                self.pool.currency0.clone(),
-                self.pool.currency1.clone(),
-                self.pool.fee,
-                self.pool.tick_spacing.to_i24().as_i32(),
-                self.pool.hooks,
-                self.pool.sqrt_price_x96,
-                self.pool.liquidity,
-            )?,
-            self.tick_lower.try_into().unwrap(),
-            self.tick_upper.try_into().unwrap(),
-            amount0,
-            amount1,
-            false,
-        )?;
-
         // Note: Slippage derivation in v4 is different from v3.
         // When creating a position (minting) or adding to a position (increasing) slippage is
         // bounded by the MAXIMUM amount in in token0 and token1.
@@ -278,7 +258,7 @@ impl<TP: TickDataProvider> Position<TP> {
         // Ie...We want the larger amounts, which occurs at the upper price for amount1...
         let amount1 = Position::new(
             pool_upper,
-            position_without_slippage.liquidity,
+            self.liquidity, // The precise liquidity calculated offchain
             self.tick_lower.try_into().unwrap(),
             self.tick_upper.try_into().unwrap(),
         )
@@ -287,7 +267,7 @@ impl<TP: TickDataProvider> Position<TP> {
         // ...and the lower for amount0
         let amount0 = Position::new(
             pool_lower,
-            position_without_slippage.liquidity,
+            self.liquidity, // The precise liquidity calculated offchain
             self.tick_lower.try_into().unwrap(),
             self.tick_upper.try_into().unwrap(),
         )
@@ -555,4 +535,141 @@ pub fn calculate_position_key(
     salt: B256,
 ) -> B256 {
     keccak256((owner, tick_lower, tick_upper, salt).abi_encode_packed())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tests::*;
+    use once_cell::sync::Lazy;
+
+    static POOL_SQRT_RATIO_START: Lazy<U160> =
+        Lazy::new(|| encode_sqrt_ratio_x96(100000000_u128, 100000000000000000000_u128));
+    static POOL_TICK_CURRENT: Lazy<i32> = Lazy::new(|| {
+        get_tick_at_sqrt_ratio(*POOL_SQRT_RATIO_START)
+            .unwrap()
+            .as_i32()
+    });
+    const TICK_SPACING: i32 = 10;
+    static DAI_USDC: Lazy<Pool> = Lazy::new(|| {
+        Pool::new(
+            DAI.clone().into(),
+            USDC.clone().into(),
+            FeeAmount::LOW.into(),
+            10,
+            Address::ZERO,
+            *POOL_SQRT_RATIO_START,
+            0,
+        )
+        .unwrap()
+    });
+
+    mod mint_amounts_with_slippage {
+        use super::*;
+
+        mod zero_slippage {
+            use super::*;
+
+            static SLIPPAGE_TOLERANCE: Lazy<Percent> = Lazy::new(Percent::default);
+
+            #[test]
+            fn is_correct_for_positions_below() {
+                let liquidity = max_liquidity_for_amounts(
+                    DAI_USDC.sqrt_price_x96,
+                    get_sqrt_ratio_at_tick(
+                        (nearest_usable_tick(*POOL_TICK_CURRENT, TICK_SPACING) + TICK_SPACING)
+                            .to_i24(),
+                    )
+                    .unwrap(),
+                    get_sqrt_ratio_at_tick(
+                        (nearest_usable_tick(*POOL_TICK_CURRENT, TICK_SPACING) + TICK_SPACING * 2)
+                            .to_i24(),
+                    )
+                    .unwrap(),
+                    uint!(49949961958869841738198_U256),
+                    U256::ZERO,
+                    true,
+                );
+
+                let mut position = Position::new(
+                    DAI_USDC.clone(),
+                    liquidity.to_u128().unwrap(),
+                    nearest_usable_tick(*POOL_TICK_CURRENT, TICK_SPACING) + TICK_SPACING,
+                    nearest_usable_tick(*POOL_TICK_CURRENT, TICK_SPACING) + TICK_SPACING * 2,
+                );
+
+                let MintAmounts { amount0, amount1 } = position
+                    .mint_amounts_with_slippage(&SLIPPAGE_TOLERANCE)
+                    .unwrap();
+                assert_eq!(amount0.to_string(), "49949961958869841738198");
+                assert_eq!(amount1.to_string(), "0");
+            }
+
+            #[test]
+            fn is_correct_for_positions_above() {
+                let liquidity = max_liquidity_for_amounts(
+                    DAI_USDC.sqrt_price_x96,
+                    get_sqrt_ratio_at_tick(
+                        (nearest_usable_tick(*POOL_TICK_CURRENT, TICK_SPACING) - TICK_SPACING * 2)
+                            .to_i24(),
+                    )
+                    .unwrap(),
+                    get_sqrt_ratio_at_tick(
+                        (nearest_usable_tick(*POOL_TICK_CURRENT, TICK_SPACING) - TICK_SPACING)
+                            .to_i24(),
+                    )
+                    .unwrap(),
+                    U256::ZERO,
+                    uint!(49970077053_U256),
+                    true,
+                );
+
+                let mut position = Position::new(
+                    DAI_USDC.clone(),
+                    liquidity.to_u128().unwrap(),
+                    nearest_usable_tick(*POOL_TICK_CURRENT, TICK_SPACING) - TICK_SPACING * 2,
+                    nearest_usable_tick(*POOL_TICK_CURRENT, TICK_SPACING) - TICK_SPACING,
+                );
+
+                let MintAmounts { amount0, amount1 } = position
+                    .mint_amounts_with_slippage(&SLIPPAGE_TOLERANCE)
+                    .unwrap();
+                assert_eq!(amount0.to_string(), "0");
+                assert_eq!(amount1.to_string(), "49970077053");
+            }
+
+            #[test]
+            fn is_correct_for_positions_within() {
+                let liquidity = max_liquidity_for_amounts(
+                    DAI_USDC.sqrt_price_x96,
+                    get_sqrt_ratio_at_tick(
+                        (nearest_usable_tick(*POOL_TICK_CURRENT, TICK_SPACING) - TICK_SPACING * 2)
+                            .to_i24(),
+                    )
+                    .unwrap(),
+                    get_sqrt_ratio_at_tick(
+                        (nearest_usable_tick(*POOL_TICK_CURRENT, TICK_SPACING) + TICK_SPACING * 2)
+                            .to_i24(),
+                    )
+                    .unwrap(),
+                    uint!(120054069145287995740584_U256),
+                    uint!(79831926243_U256),
+                    true,
+                );
+
+                let mut position = Position::new(
+                    DAI_USDC.clone(),
+                    liquidity.to_u128().unwrap(),
+                    nearest_usable_tick(*POOL_TICK_CURRENT, TICK_SPACING) - TICK_SPACING * 2,
+                    nearest_usable_tick(*POOL_TICK_CURRENT, TICK_SPACING) + TICK_SPACING * 2,
+                );
+
+                let MintAmounts { amount0, amount1 } = position
+                    .mint_amounts_with_slippage(&SLIPPAGE_TOLERANCE)
+                    .unwrap();
+                assert_eq!(amount0.to_string(), "120054069145287995740584");
+                assert_eq!(amount1.to_string(), "79831926243");
+            }
+        }
+    }
 }
