@@ -211,6 +211,18 @@ impl<TP: TickDataProvider> Pool<TP> {
         self.involves_currency(currency)
     }
 
+    /// v4-only involvesToken convenience method, used for mixed route ETH <-> WETH connection only
+    pub fn v4_involves_token(&self, currency: &impl BaseCurrency) -> bool {
+        if self.involves_currency(currency) {
+            return true;
+        }
+        let wrapped = currency.wrapped();
+        wrapped.equals(&self.currency0)
+            || wrapped.equals(&self.currency1)
+            || wrapped.equals(self.currency0.wrapped())
+            || wrapped.equals(self.currency1.wrapped())
+    }
+
     /// Returns the current mid price of the pool in terms of currency0, i.e. the ratio of currency1
     /// over currency0
     #[inline]
@@ -760,6 +772,46 @@ mod tests {
         assert!(USDC_DAI.involves_currency(&USDC.clone()));
         assert!(USDC_DAI.involves_currency(&DAI.clone()));
         assert!(!USDC_DAI.involves_currency(&WETH9::on_chain(1).unwrap()));
+    }
+
+    mod v4_involves_token {
+        use super::*;
+
+        #[test]
+        fn pool_with_native_eth_and_dai() {
+            let pool = Pool::new(
+                ETHER.clone().into(),
+                DAI.clone().into(),
+                FeeAmount::LOW.into(),
+                10,
+                Address::ZERO,
+                encode_sqrt_ratio_x96(1, 1),
+                0,
+            )
+            .unwrap();
+
+            assert!(pool.v4_involves_token(&ETHER.clone()));
+            assert!(pool.v4_involves_token(&DAI.clone()));
+            assert!(pool.v4_involves_token(&WETH.clone()));
+        }
+
+        #[test]
+        fn pool_with_weth_and_dai() {
+            let pool = Pool::new(
+                WETH.clone().into(),
+                DAI.clone().into(),
+                FeeAmount::LOW.into(),
+                10,
+                Address::ZERO,
+                encode_sqrt_ratio_x96(1, 1),
+                0,
+            )
+            .unwrap();
+
+            assert!(pool.v4_involves_token(&ETHER.clone()));
+            assert!(pool.v4_involves_token(&DAI.clone()));
+            assert!(pool.v4_involves_token(&WETH.clone()));
+        }
     }
 
     mod swaps {
