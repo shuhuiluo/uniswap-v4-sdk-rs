@@ -97,7 +97,7 @@ where
     /// Returns the mid price of the route
     #[inline]
     pub fn mid_price(&self) -> Result<Price<TInput, TOutput>, Error> {
-        let mut price = self.pools[0].price_of(&self.path_input)?;
+        let mut price = self.pools[0].price_of(&self.input)?;
         for pool in &self.pools[1..] {
             price = price.multiply(&pool.price_of(&price.quote_currency)?)?;
         }
