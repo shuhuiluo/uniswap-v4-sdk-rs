@@ -228,12 +228,14 @@ pub fn add_call_parameters<TP: TickDataProvider>(
                 planner.add_settle(&position.pool.currency0, false, None);
                 planner.add_settle(&position.pool.currency1, false, None);
                 // sweep any leftover wrapped native that was not unwrapped
+                // recipient will be the same as the v4 lp token recipient
                 planner.add_sweep(position.pool.currency0.wrapped(), opts.recipient);
                 planner.add_sweep(&position.pool.currency1, opts.recipient);
             } else {
                 // payer is v4 position manager
                 planner.add_settle(&position.pool.currency0, false, None);
                 planner.add_settle(&position.pool.currency1, false, None);
+                // recipient will be the same as the v4 lp token recipient
                 planner.add_sweep(&position.pool.currency0, opts.recipient);
                 planner.add_sweep(&position.pool.currency1, opts.recipient);
             }

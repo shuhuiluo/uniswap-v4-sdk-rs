@@ -328,10 +328,7 @@ mod tests {
             0x10
         );
         assert_eq!(discriminant(&Actions::TAKE_PAIR(Default::default())), 0x11);
-        assert_eq!(
-            discriminant(&Actions::CLOSE_CURRENCY(Address::ZERO)),
-            0x12
-        );
+        assert_eq!(discriminant(&Actions::CLOSE_CURRENCY(Address::ZERO)), 0x12);
         assert_eq!(discriminant(&Actions::SWEEP(Default::default())), 0x14);
         assert_eq!(discriminant(&Actions::UNWRAP(U256::ZERO)), 0x16);
     }
