@@ -32,8 +32,11 @@ pub enum Actions {
     TAKE_PORTION(TakePortionParams) = 0x10,
     TAKE_PAIR(TakePairParams) = 0x11,
 
-    CLOSE_CURRENCY(CloseCurrencyParams) = 0x12,
+    CLOSE_CURRENCY(Address) = 0x12,
     SWEEP(SweepParams) = 0x14,
+
+    // for wrapping/unwrapping native
+    UNWRAP(U256) = 0x16,
 }
 
 /// https://doc.rust-lang.org/error_codes/E0732.html
@@ -68,6 +71,7 @@ impl Actions {
             Self::TAKE_PAIR(params) => params.abi_encode(),
             Self::CLOSE_CURRENCY(params) => params.abi_encode(),
             Self::SWEEP(params) => params.abi_encode(),
+            Self::UNWRAP(params) => params.abi_encode(),
         }
         .into()
     }
@@ -93,8 +97,9 @@ impl Actions {
             0x0f => Self::TAKE_ALL(TakeAllParams::abi_decode_validate(data)?),
             0x10 => Self::TAKE_PORTION(TakePortionParams::abi_decode_validate(data)?),
             0x11 => Self::TAKE_PAIR(TakePairParams::abi_decode_validate(data)?),
-            0x12 => Self::CLOSE_CURRENCY(CloseCurrencyParams::abi_decode_validate(data)?),
+            0x12 => Self::CLOSE_CURRENCY(Address::abi_decode_validate(data)?),
             0x14 => Self::SWEEP(SweepParams::abi_decode_validate(data)?),
+            0x16 => Self::UNWRAP(U256::abi_decode_validate(data)?),
             _ => return Err(Error::InvalidAction(command)),
         })
     }
@@ -202,6 +207,11 @@ impl V4Planner {
             recipient,
             amount: amount.unwrap_or_default(),
         }))
+    }
+
+    #[inline]
+    pub fn add_unwrap(&mut self, amount: U256) -> &mut Self {
+        self.add_action(&Actions::UNWRAP(amount))
     }
 
     #[inline]
@@ -319,10 +329,11 @@ mod tests {
         );
         assert_eq!(discriminant(&Actions::TAKE_PAIR(Default::default())), 0x11);
         assert_eq!(
-            discriminant(&Actions::CLOSE_CURRENCY(Default::default())),
+            discriminant(&Actions::CLOSE_CURRENCY(Address::ZERO)),
             0x12
         );
         assert_eq!(discriminant(&Actions::SWEEP(Default::default())), 0x14);
+        assert_eq!(discriminant(&Actions::UNWRAP(U256::ZERO)), 0x16);
     }
 
     #[test]
@@ -411,6 +422,22 @@ mod tests {
             assert_eq!(
                 planner.params[0],
                 hex!("0000000000000000000000006b175474e89094c44da98b954eedeac495271d0f000000000000000000000000aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0000000000000000000000000000000000000000000000000000000000000008").to_vec()
+            );
+        }
+    }
+
+    mod add_unwrap {
+        use super::*;
+        use alloy_primitives::uint;
+
+        #[test]
+        fn completes_v4_unwrap() {
+            let mut planner = V4Planner::default();
+            planner.add_unwrap(uint!(8_U256));
+            assert_eq!(planner.actions, vec![0x16]);
+            assert_eq!(
+                planner.params[0],
+                hex!("0000000000000000000000000000000000000000000000000000000000000008").to_vec()
             );
         }
     }

@@ -52,9 +52,7 @@ mod tests {
                 currency: ADDRESS_ONE,
                 recipient: ADDRESS_TWO,
             }),
-            Actions::CLOSE_CURRENCY(CloseCurrencyParams {
-                currency: ADDRESS_ONE,
-            }),
+            Actions::CLOSE_CURRENCY(ADDRESS_ONE),
             Actions::TAKE_PAIR(TakePairParams {
                 currency0: ADDRESS_ONE,
                 currency1: ADDRESS_TWO,

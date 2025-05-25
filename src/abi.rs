@@ -138,17 +138,6 @@ sol! {
     }
 
     #[derive(Debug, Default, PartialEq, Eq)]
-    struct SettleTakePairParams {
-        address settleCurrency;
-        address takeCurrency;
-    }
-
-    #[derive(Debug, Default, PartialEq, Eq)]
-    struct CloseCurrencyParams {
-        address currency;
-    }
-
-    #[derive(Debug, Default, PartialEq, Eq)]
     struct SweepParams {
         address currency;
         address recipient;

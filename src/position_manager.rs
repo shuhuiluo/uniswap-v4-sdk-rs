@@ -14,6 +14,9 @@ pub use uniswap_v3_sdk::prelude::NFTPermitData;
 /// Shared Action Constants used in the v4 Router and v4 position manager
 pub const MSG_SENDER: Address = address!("0000000000000000000000000000000000000001");
 
+/// Used when unwrapping weth in positon manager
+pub const OPEN_DELTA: U256 = U256::ZERO;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommonOptions {
     /// How much the pool price is allowed to move from the specified action.
@@ -164,6 +167,16 @@ pub fn add_call_parameters<TP: TickDataProvider>(
         }
     }
 
+    // position.pool.currency0 is native if and only if options.useNative is set
+    assert!(
+        if let Some(ether) = &options.use_native {
+            position.pool.currency0.equals(ether)
+        } else {
+            !position.pool.currency0.is_native()
+        },
+        "Native currency must match pool currency0 or not be used when currency0 is not native"
+    );
+
     // adjust for slippage
     let MintAmounts {
         amount0: amount0_max,
@@ -203,36 +216,39 @@ pub fn add_call_parameters<TP: TickDataProvider>(
         }
     }
 
+    let mut value = U256::ZERO;
+
     // If migrating, we need to settle and sweep both currencies individually
-    if let AddLiquiditySpecificOptions::Mint(opts) = options.specific_opts {
-        if opts.migrate {
-            // payer is v4 positiion manager
-            planner.add_settle(&position.pool.currency0, false, None);
-            planner.add_settle(&position.pool.currency1, false, None);
-            planner.add_sweep(&position.pool.currency0, opts.recipient);
-            planner.add_sweep(&position.pool.currency1, opts.recipient);
-        } else {
+    match options.specific_opts {
+        AddLiquiditySpecificOptions::Mint(opts) if opts.migrate => {
+            if options.use_native.is_some() {
+                // unwrap the exact amount needed to send to the pool manager
+                planner.add_unwrap(OPEN_DELTA);
+                // payer is v4 position manager
+                planner.add_settle(&position.pool.currency0, false, None);
+                planner.add_settle(&position.pool.currency1, false, None);
+                // sweep any leftover wrapped native that was not unwrapped
+                planner.add_sweep(position.pool.currency0.wrapped(), opts.recipient);
+                planner.add_sweep(&position.pool.currency1, opts.recipient);
+            } else {
+                // payer is v4 position manager
+                planner.add_settle(&position.pool.currency0, false, None);
+                planner.add_settle(&position.pool.currency1, false, None);
+                planner.add_sweep(&position.pool.currency0, opts.recipient);
+                planner.add_sweep(&position.pool.currency1, opts.recipient);
+            }
+        }
+        _ => {
             // need to settle both currencies when minting / adding liquidity (user is the payer)
             planner.add_settle_pair(&position.pool.currency0, &position.pool.currency1);
+            // When not migrating and adding native currency, add a final sweep
+            if options.use_native.is_some() {
+                // Any sweeping must happen after the settling.
+                // native currency will always be currency0 in v4
+                value = amount0_max;
+                planner.add_sweep(&position.pool.currency0, MSG_SENDER);
+            }
         }
-    } else {
-        planner.add_settle_pair(&position.pool.currency0, &position.pool.currency1);
-    }
-
-    // Any sweeping must happen after the settling.
-    let mut value = U256::ZERO;
-    if options.use_native.is_some() {
-        assert!(
-            position.pool.currency0.is_native() || position.pool.currency1.is_native(),
-            "NO_NATIVE"
-        );
-        let native_currency: &Currency;
-        (native_currency, value) = if position.pool.currency0.is_native() {
-            (&position.pool.currency0, amount0_max)
-        } else {
-            (&position.pool.currency1, amount1_max)
-        };
-        planner.add_sweep(native_currency, MSG_SENDER);
     }
 
     calldatas.push(encode_modify_liquidities(
