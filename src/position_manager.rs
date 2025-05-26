@@ -2,7 +2,7 @@ use crate::prelude::{Error, *};
 use alloc::vec::Vec;
 use alloy_primitives::{address, Address, Bytes, Signature, U160, U256};
 use alloy_sol_types::{eip712_domain, SolCall};
-use derive_more::{Deref, DerefMut};
+use derive_more::{Deref, DerefMut, From};
 use num_traits::ToPrimitive;
 use uniswap_sdk_core::prelude::*;
 use uniswap_v3_sdk::prelude::{
@@ -45,10 +45,10 @@ pub struct MintSpecificOptions {
     pub migrate: bool,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, From)]
 pub enum AddLiquiditySpecificOptions {
-    Mint(MintSpecificOptions),
-    Increase(ModifyPositionSpecificOptions),
+    Mint(#[from] MintSpecificOptions),
+    Increase(#[from] ModifyPositionSpecificOptions),
 }
 
 /// Options for producing the calldata to add liquidity.
@@ -72,7 +72,7 @@ impl Default for AddLiquidityOptions {
             common_opts: Default::default(),
             use_native: None,
             batch_permit: None,
-            specific_opts: AddLiquiditySpecificOptions::Mint(MintSpecificOptions::default()),
+            specific_opts: MintSpecificOptions::default().into(),
         }
     }
 }
@@ -620,6 +620,14 @@ mod tests {
         }
     }
 
+    fn mint_specific_options() -> AddLiquiditySpecificOptions {
+        MintSpecificOptions {
+            recipient: RECIPIENT,
+            ..Default::default()
+        }
+        .into()
+    }
+
     mod create_call_parameters {
         use super::*;
 
@@ -671,10 +679,7 @@ mod tests {
 
             let options = AddLiquidityOptions {
                 common_opts: common_options(),
-                specific_opts: AddLiquiditySpecificOptions::Mint(MintSpecificOptions {
-                    recipient: RECIPIENT,
-                    ..Default::default()
-                }),
+                specific_opts: mint_specific_options(),
                 ..Default::default()
             };
 
@@ -691,10 +696,7 @@ mod tests {
                 common_opts: common_options(),
                 use_native: Some(ETHER.clone()),
                 batch_permit: None,
-                specific_opts: AddLiquiditySpecificOptions::Mint(MintSpecificOptions {
-                    recipient: RECIPIENT,
-                    ..Default::default()
-                }),
+                specific_opts: mint_specific_options(),
             };
 
             add_call_parameters(&mut position, options).unwrap();
@@ -708,10 +710,7 @@ mod tests {
 
             let options = AddLiquidityOptions {
                 common_opts: common_options(),
-                specific_opts: AddLiquiditySpecificOptions::Mint(MintSpecificOptions {
-                    recipient: RECIPIENT,
-                    ..Default::default()
-                }),
+                specific_opts: mint_specific_options(),
                 ..Default::default()
             };
 
@@ -725,11 +724,12 @@ mod tests {
 
             let options = AddLiquidityOptions {
                 common_opts: common_options(),
-                specific_opts: AddLiquiditySpecificOptions::Mint(MintSpecificOptions {
+                specific_opts: MintSpecificOptions {
                     recipient: RECIPIENT,
                     create_pool: true,
                     ..Default::default()
-                }),
+                }
+                .into(),
                 ..Default::default()
             };
 
@@ -743,10 +743,7 @@ mod tests {
 
             let options = AddLiquidityOptions {
                 common_opts: common_options(),
-                specific_opts: AddLiquiditySpecificOptions::Mint(MintSpecificOptions {
-                    recipient: RECIPIENT,
-                    ..Default::default()
-                }),
+                specific_opts: mint_specific_options(),
                 ..Default::default()
             };
 
@@ -790,9 +787,7 @@ mod tests {
 
             let options = AddLiquidityOptions {
                 common_opts: common_options(),
-                specific_opts: AddLiquiditySpecificOptions::Increase(
-                    ModifyPositionSpecificOptions { token_id: TOKEN_ID },
-                ),
+                specific_opts: ModifyPositionSpecificOptions { token_id: TOKEN_ID }.into(),
                 ..Default::default()
             };
 
@@ -836,12 +831,13 @@ mod tests {
 
             let options = AddLiquidityOptions {
                 common_opts: common_options(),
-                specific_opts: AddLiquiditySpecificOptions::Mint(MintSpecificOptions {
+                specific_opts: MintSpecificOptions {
                     recipient: RECIPIENT,
                     create_pool: true,
                     sqrt_price_x96: Some(*SQRT_PRICE_1_1),
                     migrate: false,
-                }),
+                }
+                .into(),
                 ..Default::default()
             };
 
@@ -892,10 +888,7 @@ mod tests {
                 common_opts: common_options(),
                 use_native: Some(ETHER.clone()),
                 batch_permit: None,
-                specific_opts: AddLiquiditySpecificOptions::Mint(MintSpecificOptions {
-                    recipient: RECIPIENT,
-                    ..Default::default()
-                }),
+                specific_opts: mint_specific_options(),
             };
 
             let MethodParameters { calldata, value } =
@@ -939,11 +932,12 @@ mod tests {
 
             let options = AddLiquidityOptions {
                 common_opts: common_options(),
-                specific_opts: AddLiquiditySpecificOptions::Mint(MintSpecificOptions {
+                specific_opts: MintSpecificOptions {
                     recipient: RECIPIENT,
                     migrate: true,
                     ..Default::default()
-                }),
+                }
+                .into(),
                 ..Default::default()
             };
 
@@ -992,11 +986,12 @@ mod tests {
                 common_opts: common_options(),
                 use_native: Some(ETHER.clone()),
                 batch_permit: None,
-                specific_opts: AddLiquiditySpecificOptions::Mint(MintSpecificOptions {
+                specific_opts: MintSpecificOptions {
                     recipient: RECIPIENT,
                     migrate: true,
                     ..Default::default()
-                }),
+                }
+                .into(),
             };
 
             let MethodParameters { calldata, value } =
@@ -1055,10 +1050,7 @@ mod tests {
                 common_opts: common_options(),
                 use_native: None,
                 batch_permit: Some(batch_permit.clone()),
-                specific_opts: AddLiquiditySpecificOptions::Mint(MintSpecificOptions {
-                    recipient: RECIPIENT,
-                    ..Default::default()
-                }),
+                specific_opts: mint_specific_options(),
             };
 
             let MethodParameters { calldata, value } =
