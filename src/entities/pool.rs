@@ -467,7 +467,7 @@ mod tests {
                 FeeAmount::MEDIUM.into(),
                 10,
                 Address::ZERO,
-                encode_sqrt_ratio_x96(1, 1),
+                *SQRT_PRICE_1_1,
                 0,
             )
             .unwrap();
@@ -482,7 +482,7 @@ mod tests {
                 uint!(1_000_000_U24),
                 10,
                 Address::ZERO,
-                encode_sqrt_ratio_x96(1, 1),
+                *SQRT_PRICE_1_1,
                 0,
             )
             .unwrap();
@@ -496,7 +496,7 @@ mod tests {
                 DYANMIC_FEE_FLAG,
                 10,
                 address!("fff0000000000000000000000000000000000000"),
-                encode_sqrt_ratio_x96(1, 1),
+                *SQRT_PRICE_1_1,
                 0,
             )
             .unwrap();
@@ -512,7 +512,7 @@ mod tests {
                 DYANMIC_FEE_FLAG,
                 10,
                 Address::ZERO,
-                encode_sqrt_ratio_x96(1, 1),
+                *SQRT_PRICE_1_1,
                 0,
             )
             .unwrap();
@@ -527,7 +527,7 @@ mod tests {
                 FeeAmount::MEDIUM.into(),
                 10,
                 Address::ZERO,
-                encode_sqrt_ratio_x96(1, 1),
+                *SQRT_PRICE_1_1,
                 0,
             )
             .unwrap();
@@ -541,7 +541,7 @@ mod tests {
                 FeeAmount::MEDIUM.into(),
                 10,
                 Address::ZERO,
-                encode_sqrt_ratio_x96(1, 1),
+                *SQRT_PRICE_1_1,
                 0,
             )
             .unwrap();
@@ -555,7 +555,7 @@ mod tests {
                 FeeAmount::LOWEST.into(),
                 10,
                 Address::ZERO,
-                encode_sqrt_ratio_x96(1, 1),
+                *SQRT_PRICE_1_1,
                 0,
             )
             .unwrap();
@@ -569,7 +569,7 @@ mod tests {
                 FeeAmount::HIGH.into(),
                 10,
                 Address::ZERO,
-                encode_sqrt_ratio_x96(1, 1),
+                *SQRT_PRICE_1_1,
                 0,
             )
             .unwrap();
@@ -786,7 +786,7 @@ mod tests {
                 FeeAmount::LOW.into(),
                 10,
                 Address::ZERO,
-                encode_sqrt_ratio_x96(1, 1),
+                *SQRT_PRICE_1_1,
                 0,
             )
             .unwrap();
@@ -804,7 +804,7 @@ mod tests {
                 FeeAmount::LOW.into(),
                 10,
                 Address::ZERO,
-                encode_sqrt_ratio_x96(1, 1),
+                *SQRT_PRICE_1_1,
                 0,
             )
             .unwrap();
@@ -826,7 +826,7 @@ mod tests {
                 FeeAmount::LOWEST.into(),
                 10,
                 Address::ZERO,
-                encode_sqrt_ratio_x96(1, 1),
+                *SQRT_PRICE_1_1,
                 ONE_ETHER,
                 TICK_LIST.clone(),
             )

@@ -248,7 +248,7 @@ mod tests {
             FeeAmount::MEDIUM.into(),
             10,
             Address::ZERO,
-            encode_sqrt_ratio_x96(1, 1),
+            *SQRT_PRICE_1_1,
             1_000_000_000 * ONE_ETHER,
             TICK_LIST.clone(),
         )
@@ -261,7 +261,7 @@ mod tests {
             FeeAmount::MEDIUM.into(),
             10,
             Address::ZERO,
-            encode_sqrt_ratio_x96(1, 1),
+            *SQRT_PRICE_1_1,
             1_000_000_000 * ONE_ETHER,
             TICK_LIST.clone(),
         )
@@ -274,7 +274,7 @@ mod tests {
             FeeAmount::MEDIUM.into(),
             10,
             Address::ZERO,
-            encode_sqrt_ratio_x96(1, 1),
+            *SQRT_PRICE_1_1,
             ONE_ETHER,
             TICK_LIST.clone(),
         )

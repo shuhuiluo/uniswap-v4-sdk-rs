@@ -26,7 +26,7 @@ mod tests {
     use crate::{create_route, prelude::*, tests::*};
     use alloy_primitives::{address, uint, Address, U256};
     use once_cell::sync::Lazy;
-    use uniswap_v3_sdk::prelude::{encode_sqrt_ratio_x96, FeeAmount};
+    use uniswap_v3_sdk::prelude::FeeAmount;
 
     const ADDRESS_ONE: Address = address!("0000000000000000000000000000000000000001");
     const ADDRESS_TWO: Address = address!("0000000000000000000000000000000000000002");
@@ -39,7 +39,7 @@ mod tests {
             FeeAmount::MEDIUM.into(),
             10,
             Address::ZERO,
-            encode_sqrt_ratio_x96(1, 1),
+            *SQRT_PRICE_1_1,
             0,
         )
         .unwrap()

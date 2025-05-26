@@ -17,7 +17,7 @@ pub const MSG_SENDER: Address = address!("00000000000000000000000000000000000000
 /// Used when unwrapping weth in positon manager
 pub const OPEN_DELTA: U256 = U256::ZERO;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct CommonOptions {
     /// How much the pool price is allowed to move from the specified action.
     pub slippage_tolerance: Percent,
@@ -27,13 +27,13 @@ pub struct CommonOptions {
     pub hook_data: Bytes,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct ModifyPositionSpecificOptions {
     /// Indicates the ID of the position to increase liquidity for.
     pub token_id: U256,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct MintSpecificOptions {
     /// The account that should receive the minted NFT.
     pub recipient: Address,
@@ -52,7 +52,7 @@ pub enum AddLiquiditySpecificOptions {
 }
 
 /// Options for producing the calldata to add liquidity.
-#[derive(Debug, Clone, PartialEq, Deref, DerefMut)]
+#[derive(Clone, Debug, PartialEq, Deref, DerefMut)]
 pub struct AddLiquidityOptions {
     #[deref]
     #[deref_mut]
@@ -63,6 +63,18 @@ pub struct AddLiquidityOptions {
     pub batch_permit: Option<BatchPermitOptions>,
     /// [`MintSpecificOptions`] or [`IncreaseSpecificOptions`]
     pub specific_opts: AddLiquiditySpecificOptions,
+}
+
+impl Default for AddLiquidityOptions {
+    #[inline]
+    fn default() -> Self {
+        Self {
+            common_opts: Default::default(),
+            use_native: None,
+            batch_permit: None,
+            specific_opts: AddLiquiditySpecificOptions::Mint(MintSpecificOptions::default()),
+        }
+    }
 }
 
 /// Options for producing the calldata to exit a position.
@@ -82,7 +94,20 @@ pub struct RemoveLiquidityOptions {
     pub permit: Option<NFTPermitOptions>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Deref, DerefMut)]
+impl Default for RemoveLiquidityOptions {
+    #[inline]
+    fn default() -> Self {
+        Self {
+            common_opts: Default::default(),
+            token_id: U256::ZERO,
+            liquidity_percentage: Percent::new(1, 1),
+            burn_token: false,
+            permit: None,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Deref, DerefMut)]
 pub struct CollectOptions {
     #[deref]
     #[deref_mut]
@@ -174,7 +199,7 @@ pub fn add_call_parameters<TP: TickDataProvider>(
         } else {
             !position.pool.currency0.is_native()
         },
-        "Native currency must match pool currency0 or not be used when currency0 is not native"
+        "NATIVE_NOT_SET"
     );
 
     // adjust for slippage
@@ -517,5 +542,795 @@ pub const fn get_permit_data(
     NFTPermitData {
         domain,
         values: permit,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tests::*;
+    use alloy_primitives::{address, hex, uint, Address, Bytes, Signature, U256};
+    use once_cell::sync::Lazy;
+    use uniswap_sdk_core::token;
+    use uniswap_v3_sdk::prelude::{decode_multicall, FeeAmount};
+
+    static CURRENCY0: Lazy<Currency> = Lazy::new(|| {
+        token!(
+            1,
+            "0000000000000000000000000000000000000001",
+            18,
+            "t0",
+            "currency0"
+        )
+        .into()
+    });
+    static CURRENCY1: Lazy<Currency> = Lazy::new(|| {
+        token!(
+            1,
+            "0000000000000000000000000000000000000002",
+            18,
+            "t1",
+            "currency1"
+        )
+        .into()
+    });
+
+    const FEE: FeeAmount = FeeAmount::MEDIUM;
+    const TICK_SPACING: i32 = 60;
+
+    static POOL_0_1: Lazy<Pool> = Lazy::new(|| {
+        Pool::new(
+            CURRENCY0.clone(),
+            CURRENCY1.clone(),
+            FEE.into(),
+            TICK_SPACING,
+            Address::ZERO,
+            *SQRT_PRICE_1_1,
+            0,
+        )
+        .unwrap()
+    });
+
+    static POOL_1_ETH: Lazy<Pool> = Lazy::new(|| {
+        Pool::new(
+            ETHER.clone().into(),
+            CURRENCY1.clone(),
+            FEE.into(),
+            TICK_SPACING,
+            Address::ZERO,
+            *SQRT_PRICE_1_1,
+            0,
+        )
+        .unwrap()
+    });
+
+    const TOKEN_ID: U256 = uint!(1_U256);
+    static SLIPPAGE_TOLERANCE: Lazy<Percent> = Lazy::new(|| Percent::new(1, 100));
+    const DEADLINE: U256 = uint!(123_U256);
+
+    const MOCK_OWNER: Address = address!("000000000000000000000000000000000000000a");
+    const MOCK_SPENDER: Address = address!("000000000000000000000000000000000000000b");
+    const RECIPIENT: Address = address!("000000000000000000000000000000000000000c");
+
+    fn common_options() -> CommonOptions {
+        CommonOptions {
+            slippage_tolerance: SLIPPAGE_TOLERANCE.clone(),
+            deadline: DEADLINE,
+            hook_data: Bytes::default(),
+        }
+    }
+
+    mod create_call_parameters {
+        use super::*;
+
+        #[test]
+        fn succeeds() {
+            let pool_key = Pool::get_pool_key(
+                &CURRENCY0.clone(),
+                &CURRENCY1.clone(),
+                FEE.into(),
+                TICK_SPACING,
+                Address::ZERO,
+            )
+            .unwrap();
+
+            let MethodParameters { calldata, value } =
+                create_call_parameters(pool_key, *SQRT_PRICE_1_1);
+
+            assert_eq!(calldata.to_vec(), hex!("0xf7020405000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000bb8000000000000000000000000000000000000000000000000000000000000003c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000"));
+            assert_eq!(value, U256::ZERO);
+        }
+
+        #[test]
+        fn succeeds_with_nonzero_hook() {
+            let hook = address!("1100000000000000000000000000000000002401");
+            let pool_key = Pool::get_pool_key(
+                &CURRENCY0.clone(),
+                &CURRENCY1.clone(),
+                FEE.into(),
+                TICK_SPACING,
+                hook,
+            )
+            .unwrap();
+
+            let MethodParameters { calldata, value } =
+                create_call_parameters(pool_key, *SQRT_PRICE_1_1);
+
+            assert_eq!(calldata.to_vec(), hex!("0xf7020405000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000bb8000000000000000000000000000000000000000000000000000000000000003c00000000000000000000000011000000000000000000000000000000000024010000000000000000000000000000000000000001000000000000000000000000"));
+            assert_eq!(value, U256::ZERO);
+        }
+    }
+
+    mod add_call_parameters {
+        use super::*;
+
+        #[test]
+        #[should_panic(expected = "ZERO_LIQUIDITY")]
+        fn throws_if_liquidity_is_0() {
+            let mut position = Position::new(POOL_0_1.clone(), 0, -TICK_SPACING, TICK_SPACING);
+
+            let options = AddLiquidityOptions {
+                common_opts: common_options(),
+                specific_opts: AddLiquiditySpecificOptions::Mint(MintSpecificOptions {
+                    recipient: RECIPIENT,
+                    ..Default::default()
+                }),
+                ..Default::default()
+            };
+
+            add_call_parameters(&mut position, options).unwrap();
+        }
+
+        #[test]
+        #[should_panic(expected = "NATIVE_NOT_SET")]
+        fn throws_if_pool_does_not_involve_ether_and_use_native_is_set() {
+            let mut position =
+                Position::new(POOL_0_1.clone(), 8888888, -TICK_SPACING, TICK_SPACING);
+
+            let options = AddLiquidityOptions {
+                common_opts: common_options(),
+                use_native: Some(ETHER.clone()),
+                batch_permit: None,
+                specific_opts: AddLiquiditySpecificOptions::Mint(MintSpecificOptions {
+                    recipient: RECIPIENT,
+                    ..Default::default()
+                }),
+            };
+
+            add_call_parameters(&mut position, options).unwrap();
+        }
+
+        #[test]
+        #[should_panic(expected = "NATIVE_NOT_SET")]
+        fn throws_if_pool_involves_ether_and_use_native_is_not_set() {
+            let mut position =
+                Position::new(POOL_1_ETH.clone(), 8888888, -TICK_SPACING, TICK_SPACING);
+
+            let options = AddLiquidityOptions {
+                common_opts: common_options(),
+                specific_opts: AddLiquiditySpecificOptions::Mint(MintSpecificOptions {
+                    recipient: RECIPIENT,
+                    ..Default::default()
+                }),
+                ..Default::default()
+            };
+
+            add_call_parameters(&mut position, options).unwrap();
+        }
+
+        #[test]
+        #[should_panic(expected = "NO_SQRT_PRICE")]
+        fn throws_if_create_pool_is_true_but_there_is_no_sqrt_price_defined() {
+            let mut position = Position::new(POOL_0_1.clone(), 1, -TICK_SPACING, TICK_SPACING);
+
+            let options = AddLiquidityOptions {
+                common_opts: common_options(),
+                specific_opts: AddLiquiditySpecificOptions::Mint(MintSpecificOptions {
+                    recipient: RECIPIENT,
+                    create_pool: true,
+                    ..Default::default()
+                }),
+                ..Default::default()
+            };
+
+            add_call_parameters(&mut position, options).unwrap();
+        }
+
+        #[test]
+        fn succeeds_for_mint() {
+            let mut position =
+                Position::new(POOL_0_1.clone(), 5000000, -TICK_SPACING, TICK_SPACING);
+
+            let options = AddLiquidityOptions {
+                common_opts: common_options(),
+                specific_opts: AddLiquiditySpecificOptions::Mint(MintSpecificOptions {
+                    recipient: RECIPIENT,
+                    ..Default::default()
+                }),
+                ..Default::default()
+            };
+
+            let MethodParameters { calldata, value } =
+                add_call_parameters(&mut position, options).unwrap();
+
+            // Rebuild the calldata with the planner for the expected mint.
+            // Note that this test verifies that the applied logic in addCallParameters is correct
+            // but does not necessarily test the validity of the calldata itself.
+            let MintAmounts {
+                amount0: amount0_max,
+                amount1: amount1_max,
+            } = position
+                .mint_amounts_with_slippage(&SLIPPAGE_TOLERANCE.clone())
+                .unwrap();
+
+            let mut planner = V4PositionPlanner::default();
+            planner.add_mint(
+                &POOL_0_1,
+                -TICK_SPACING,
+                TICK_SPACING,
+                uint!(5000000_U256),
+                u128::try_from(amount0_max).unwrap(),
+                u128::try_from(amount1_max).unwrap(),
+                RECIPIENT,
+                Bytes::default(),
+            );
+            // Expect there to be a settle pair call afterwards
+            planner.add_settle_pair(&POOL_0_1.currency0, &POOL_0_1.currency1);
+
+            assert_eq!(
+                calldata,
+                encode_modify_liquidities(planner.0.finalize(), DEADLINE)
+            );
+            assert_eq!(value, U256::ZERO);
+        }
+
+        #[test]
+        fn succeeds_for_increase() {
+            let mut position = Position::new(POOL_0_1.clone(), 666, -TICK_SPACING, TICK_SPACING);
+
+            let options = AddLiquidityOptions {
+                common_opts: common_options(),
+                specific_opts: AddLiquiditySpecificOptions::Increase(
+                    ModifyPositionSpecificOptions { token_id: TOKEN_ID },
+                ),
+                ..Default::default()
+            };
+
+            let MethodParameters { calldata, value } =
+                add_call_parameters(&mut position, options).unwrap();
+
+            // Rebuild the calldata with the planner for increase
+            let MintAmounts {
+                amount0: amount0_max,
+                amount1: amount1_max,
+            } = position
+                .mint_amounts_with_slippage(&SLIPPAGE_TOLERANCE.clone())
+                .unwrap();
+
+            let mut planner = V4PositionPlanner::default();
+            planner.add_increase(
+                TOKEN_ID,
+                uint!(666_U256),
+                u128::try_from(amount0_max).unwrap(),
+                u128::try_from(amount1_max).unwrap(),
+                Bytes::default(),
+            );
+            // Expect there to be a settle pair call afterwards
+            planner.add_settle_pair(&POOL_0_1.currency0, &POOL_0_1.currency1);
+
+            assert_eq!(
+                calldata,
+                encode_modify_liquidities(planner.0.finalize(), DEADLINE)
+            );
+            assert_eq!(value, U256::ZERO);
+        }
+
+        #[test]
+        fn succeeds_when_create_pool_is_true() {
+            let mut position = Position::new(
+                POOL_0_1.clone(),
+                90000000000000_u128,
+                -TICK_SPACING,
+                TICK_SPACING,
+            );
+
+            let options = AddLiquidityOptions {
+                common_opts: common_options(),
+                specific_opts: AddLiquiditySpecificOptions::Mint(MintSpecificOptions {
+                    recipient: RECIPIENT,
+                    create_pool: true,
+                    sqrt_price_x96: Some(*SQRT_PRICE_1_1),
+                    migrate: false,
+                }),
+                ..Default::default()
+            };
+
+            let MethodParameters { calldata, value } =
+                add_call_parameters(&mut position, options).unwrap();
+
+            // The resulting calldata should be multicall with two calls: initializePool and
+            // modifyLiquidities
+            let calldata_arr: Vec<Bytes> = decode_multicall(&calldata).unwrap();
+            // Expect initializePool to be called correctly
+            assert_eq!(
+                calldata_arr[0],
+                encode_initialize_pool(POOL_0_1.pool_key.clone(), *SQRT_PRICE_1_1)
+            );
+
+            let MintAmounts {
+                amount0: amount0_max,
+                amount1: amount1_max,
+            } = position
+                .mint_amounts_with_slippage(&SLIPPAGE_TOLERANCE.clone())
+                .unwrap();
+
+            let mut planner = V4PositionPlanner::default();
+            // Expect position to be minted correctly
+            planner.add_mint(
+                &POOL_0_1,
+                -TICK_SPACING,
+                TICK_SPACING,
+                uint!(90000000000000_U256),
+                u128::try_from(amount0_max).unwrap(),
+                u128::try_from(amount1_max).unwrap(),
+                RECIPIENT,
+                Bytes::default(),
+            );
+            planner.add_settle_pair(&POOL_0_1.currency0, &POOL_0_1.currency1);
+            assert_eq!(
+                calldata_arr[1],
+                encode_modify_liquidities(planner.0.finalize(), DEADLINE)
+            );
+            assert_eq!(value, U256::ZERO);
+        }
+
+        #[test]
+        fn succeeds_when_use_native_is_set() {
+            let mut position = Position::new(POOL_1_ETH.clone(), 1, -TICK_SPACING, TICK_SPACING);
+
+            let options = AddLiquidityOptions {
+                common_opts: common_options(),
+                use_native: Some(ETHER.clone()),
+                batch_permit: None,
+                specific_opts: AddLiquiditySpecificOptions::Mint(MintSpecificOptions {
+                    recipient: RECIPIENT,
+                    ..Default::default()
+                }),
+            };
+
+            let MethodParameters { calldata, value } =
+                add_call_parameters(&mut position, options).unwrap();
+
+            // Rebuild the data with the planner for the expected mint. MUST sweep since we are
+            // using the native currency.
+            let MintAmounts {
+                amount0: amount0_max,
+                amount1: amount1_max,
+            } = position
+                .mint_amounts_with_slippage(&SLIPPAGE_TOLERANCE.clone())
+                .unwrap();
+
+            let mut planner = V4PositionPlanner::default();
+            // Expect position to be minted correctly
+            planner.add_mint(
+                &POOL_1_ETH,
+                -TICK_SPACING,
+                TICK_SPACING,
+                uint!(1_U256),
+                u128::try_from(amount0_max).unwrap(),
+                u128::try_from(amount1_max).unwrap(),
+                RECIPIENT,
+                Bytes::default(),
+            );
+
+            planner.add_settle_pair(&POOL_1_ETH.currency0, &POOL_1_ETH.currency1);
+            planner.add_sweep(&POOL_1_ETH.currency0, MSG_SENDER);
+
+            assert_eq!(
+                calldata,
+                encode_modify_liquidities(planner.0.finalize(), DEADLINE)
+            );
+            assert_eq!(value, amount0_max);
+        }
+
+        #[test]
+        fn succeeds_when_migrate_is_true() {
+            let mut position = Position::new(POOL_0_1.clone(), 1, -TICK_SPACING, TICK_SPACING);
+
+            let options = AddLiquidityOptions {
+                common_opts: common_options(),
+                specific_opts: AddLiquiditySpecificOptions::Mint(MintSpecificOptions {
+                    recipient: RECIPIENT,
+                    migrate: true,
+                    ..Default::default()
+                }),
+                ..Default::default()
+            };
+
+            let MethodParameters { calldata, value } =
+                add_call_parameters(&mut position, options).unwrap();
+
+            // Rebuild the data with the planner for the expected mint. MUST sweep since we are
+            // using the native currency.
+            let MintAmounts {
+                amount0: amount0_max,
+                amount1: amount1_max,
+            } = position
+                .mint_amounts_with_slippage(&SLIPPAGE_TOLERANCE.clone())
+                .unwrap();
+
+            let mut planner = V4PositionPlanner::default();
+            // Expect position to be minted correctly
+            planner.add_mint(
+                &POOL_0_1,
+                -TICK_SPACING,
+                TICK_SPACING,
+                uint!(1_U256),
+                u128::try_from(amount0_max).unwrap(),
+                u128::try_from(amount1_max).unwrap(),
+                RECIPIENT,
+                Bytes::default(),
+            );
+
+            planner.add_settle(&POOL_0_1.currency0, false, None);
+            planner.add_settle(&POOL_0_1.currency1, false, None);
+            planner.add_sweep(&POOL_0_1.currency0, RECIPIENT);
+            planner.add_sweep(&POOL_0_1.currency1, RECIPIENT);
+
+            assert_eq!(
+                calldata,
+                encode_modify_liquidities(planner.0.finalize(), DEADLINE)
+            );
+            assert_eq!(value, U256::ZERO);
+        }
+
+        #[test]
+        fn succeeds_when_migrating_to_an_eth_position() {
+            let mut position = Position::new(POOL_1_ETH.clone(), 1, -TICK_SPACING, TICK_SPACING);
+
+            let options = AddLiquidityOptions {
+                common_opts: common_options(),
+                use_native: Some(ETHER.clone()),
+                batch_permit: None,
+                specific_opts: AddLiquiditySpecificOptions::Mint(MintSpecificOptions {
+                    recipient: RECIPIENT,
+                    migrate: true,
+                    ..Default::default()
+                }),
+            };
+
+            let MethodParameters { calldata, value } =
+                add_call_parameters(&mut position, options).unwrap();
+
+            // Rebuild the data with the planner for the expected mint. MUST sweep since we are
+            // using the native currency.
+            let MintAmounts {
+                amount0: amount0_max,
+                amount1: amount1_max,
+            } = position
+                .mint_amounts_with_slippage(&SLIPPAGE_TOLERANCE.clone())
+                .unwrap();
+
+            let mut planner = V4PositionPlanner::default();
+            // Expect position to be minted correctly
+            planner.add_mint(
+                &POOL_1_ETH,
+                -TICK_SPACING,
+                TICK_SPACING,
+                uint!(1_U256),
+                u128::try_from(amount0_max).unwrap(),
+                u128::try_from(amount1_max).unwrap(),
+                RECIPIENT,
+                Bytes::default(),
+            );
+
+            planner.add_unwrap(OPEN_DELTA);
+            planner.add_settle(&POOL_1_ETH.currency0, false, None);
+            planner.add_settle(&POOL_1_ETH.currency1, false, None);
+            planner.add_sweep(POOL_1_ETH.currency0.wrapped(), RECIPIENT);
+            planner.add_sweep(&POOL_1_ETH.currency1, RECIPIENT);
+
+            assert_eq!(
+                calldata,
+                encode_modify_liquidities(planner.0.finalize(), DEADLINE)
+            );
+            assert_eq!(value, U256::ZERO);
+        }
+
+        #[test]
+        fn succeeds_for_batch_permit() {
+            let mut position = Position::new(POOL_0_1.clone(), 1, -TICK_SPACING, TICK_SPACING);
+
+            let batch_permit = BatchPermitOptions {
+                owner: MOCK_OWNER,
+                permit_batch: AllowanceTransferPermitBatch {
+                    details: vec![],
+                    spender: MOCK_SPENDER,
+                    sigDeadline: DEADLINE,
+                },
+                signature: Bytes::default(),
+            };
+
+            let options = AddLiquidityOptions {
+                common_opts: common_options(),
+                use_native: None,
+                batch_permit: Some(batch_permit.clone()),
+                specific_opts: AddLiquiditySpecificOptions::Mint(MintSpecificOptions {
+                    recipient: RECIPIENT,
+                    ..Default::default()
+                }),
+            };
+
+            let MethodParameters { calldata, value } =
+                add_call_parameters(&mut position, options).unwrap();
+
+            let calldata_arr: Vec<Bytes> = decode_multicall(&calldata).unwrap();
+            // Expect permitBatch to be called correctly
+            assert_eq!(
+                calldata_arr[0],
+                encode_permit_batch(
+                    batch_permit.owner,
+                    batch_permit.permit_batch,
+                    batch_permit.signature,
+                )
+            );
+
+            let MintAmounts {
+                amount0: amount0_max,
+                amount1: amount1_max,
+            } = position
+                .mint_amounts_with_slippage(&SLIPPAGE_TOLERANCE.clone())
+                .unwrap();
+
+            let mut planner = V4PositionPlanner::default();
+            planner.add_mint(
+                &POOL_0_1,
+                -TICK_SPACING,
+                TICK_SPACING,
+                uint!(1_U256),
+                u128::try_from(amount0_max).unwrap(),
+                u128::try_from(amount1_max).unwrap(),
+                RECIPIENT,
+                Bytes::default(),
+            );
+            planner.add_settle_pair(&POOL_0_1.currency0, &POOL_0_1.currency1);
+            assert_eq!(
+                calldata_arr[1],
+                encode_modify_liquidities(planner.0.finalize(), DEADLINE)
+            );
+            assert_eq!(value, U256::ZERO);
+        }
+    }
+
+    mod remove_call_parameters {
+        use super::*;
+
+        static POSITION: Lazy<Position> =
+            Lazy::new(|| Position::new(POOL_0_1.clone(), 100, -TICK_SPACING, TICK_SPACING));
+
+        fn remove_liq_options() -> RemoveLiquidityOptions {
+            RemoveLiquidityOptions {
+                common_opts: common_options(),
+                token_id: TOKEN_ID,
+                liquidity_percentage: Percent::new(1, 1),
+                ..Default::default()
+            }
+        }
+
+        fn partial_remove_options() -> RemoveLiquidityOptions {
+            RemoveLiquidityOptions {
+                common_opts: common_options(),
+                token_id: TOKEN_ID,
+                liquidity_percentage: SLIPPAGE_TOLERANCE.clone(),
+                ..Default::default()
+            }
+        }
+
+        fn burn_liq_options() -> RemoveLiquidityOptions {
+            RemoveLiquidityOptions {
+                burn_token: true,
+                ..remove_liq_options()
+            }
+        }
+
+        fn burn_liq_with_permit_options() -> RemoveLiquidityOptions {
+            RemoveLiquidityOptions {
+                permit: Some(NFTPermitOptions {
+                    values: NFTPermitValues {
+                        spender: MOCK_SPENDER,
+                        tokenId: TOKEN_ID,
+                        deadline: DEADLINE,
+                        nonce: uint!(1_U256),
+                    },
+                    signature: Signature::from_raw_array(&[0_u8; 65]).unwrap(),
+                }),
+                ..burn_liq_options()
+            }
+        }
+
+        #[test]
+        #[should_panic(expected = "ZERO_LIQUIDITY")]
+        fn throws_for_0_liquidity() {
+            let zero_liquidity_position =
+                Position::new(POOL_0_1.clone(), 0, -TICK_SPACING, TICK_SPACING);
+
+            remove_call_parameters(&zero_liquidity_position, remove_liq_options()).unwrap();
+        }
+
+        #[test]
+        #[should_panic(expected = "CANNOT_BURN")]
+        fn throws_when_burn_is_true_but_liquidity_percentage_is_not_100_percent() {
+            let full_liquidity_position =
+                Position::new(POOL_0_1.clone(), 999, -TICK_SPACING, TICK_SPACING);
+
+            let invalid_burn_options = RemoveLiquidityOptions {
+                burn_token: true,
+                liquidity_percentage: SLIPPAGE_TOLERANCE.clone(),
+                token_id: TOKEN_ID,
+                common_opts: common_options(),
+                permit: None,
+            };
+
+            remove_call_parameters(&full_liquidity_position, invalid_burn_options).unwrap();
+        }
+
+        #[test]
+        fn succeeds_for_burn() {
+            let position = POSITION.clone();
+            let MethodParameters { calldata, value } =
+                remove_call_parameters(&position, burn_liq_options()).unwrap();
+
+            let (amount0_min, amount1_min) = position
+                .burn_amounts_with_slippage(&SLIPPAGE_TOLERANCE.clone())
+                .unwrap();
+
+            let mut planner = V4PositionPlanner::default();
+
+            planner.add_burn(
+                TOKEN_ID,
+                u128::try_from(amount0_min).unwrap(),
+                u128::try_from(amount1_min).unwrap(),
+                Bytes::default(),
+            );
+            planner.add_take_pair(&*CURRENCY0, &*CURRENCY1, MSG_SENDER);
+
+            assert_eq!(
+                calldata,
+                encode_modify_liquidities(planner.0.finalize(), burn_liq_options().deadline)
+            );
+            assert_eq!(value, U256::ZERO);
+        }
+
+        #[test]
+        fn succeeds_for_remove_partial_liquidity() {
+            let position = POSITION.clone();
+            let MethodParameters { calldata, value } =
+                remove_call_parameters(&position, partial_remove_options()).unwrap();
+            let (amount0_min, amount1_min) = position
+                .burn_amounts_with_slippage(&SLIPPAGE_TOLERANCE.clone())
+                .unwrap();
+
+            let mut planner = V4PositionPlanner::default();
+
+            // remove 1% of 100, 1
+            planner.add_decrease(
+                TOKEN_ID,
+                uint!(1_U256), // 1% of 100 liquidity
+                u128::try_from(amount0_min).unwrap(),
+                u128::try_from(amount1_min).unwrap(),
+                Bytes::default(),
+            );
+            planner.add_take_pair(&*CURRENCY0, &*CURRENCY1, MSG_SENDER);
+
+            assert_eq!(
+                calldata,
+                encode_modify_liquidities(planner.0.finalize(), partial_remove_options().deadline)
+            );
+            assert_eq!(value, U256::ZERO);
+        }
+
+        #[test]
+        fn succeeds_for_burn_with_permit() {
+            let position = POSITION.clone();
+            let MethodParameters { calldata, value } =
+                remove_call_parameters(&position, burn_liq_with_permit_options()).unwrap();
+
+            let (amount0_min, amount1_min) = position
+                .burn_amounts_with_slippage(&SLIPPAGE_TOLERANCE.clone())
+                .unwrap();
+
+            let mut planner = V4PositionPlanner::default();
+
+            planner.add_burn(
+                TOKEN_ID,
+                u128::try_from(amount0_min).unwrap(),
+                u128::try_from(amount1_min).unwrap(),
+                Bytes::default(),
+            );
+            planner.add_take_pair(&*CURRENCY0, &*CURRENCY1, MSG_SENDER);
+
+            // The resulting calldata should be multicall with two calls:
+            // ERC721Permit.permit and modifyLiquidities
+            let calldata_arr: Vec<Bytes> = decode_multicall(&calldata).unwrap();
+            // Expect ERC721Permit.permit to be called correctly
+            let permit = burn_liq_with_permit_options().permit.unwrap();
+            assert_eq!(
+                calldata_arr[0],
+                encode_erc721_permit(
+                    permit.spender,
+                    TOKEN_ID,
+                    permit.deadline,
+                    permit.nonce,
+                    permit.signature.as_bytes().into(),
+                )
+            );
+            // Expect modifyLiquidities to be called correctly
+            assert_eq!(
+                calldata_arr[1],
+                encode_modify_liquidities(planner.0.finalize(), burn_liq_options().deadline)
+            );
+            assert_eq!(value, U256::ZERO);
+        }
+    }
+
+    mod collect_call_parameters {
+        use super::*;
+
+        #[test]
+        fn succeeds() {
+            let position = Position::new(POOL_0_1.clone(), 100, -TICK_SPACING, TICK_SPACING);
+            let MethodParameters { calldata, value } = collect_call_parameters(
+                &position,
+                CollectOptions {
+                    common_opts: common_options(),
+                    token_id: TOKEN_ID,
+                    recipient: RECIPIENT,
+                },
+            );
+
+            let mut planner = V4PositionPlanner::default();
+
+            planner.add_decrease(TOKEN_ID, U256::ZERO, 0, 0, Bytes::default());
+            planner.add_take_pair(&*CURRENCY0, &*CURRENCY1, RECIPIENT);
+
+            assert_eq!(
+                calldata,
+                encode_modify_liquidities(planner.0.finalize(), DEADLINE)
+            );
+            assert_eq!(value, U256::ZERO);
+        }
+    }
+
+    mod get_permit_data {
+        use super::*;
+        use alloy_primitives::b256;
+        use alloy_sol_types::SolStruct;
+
+        #[test]
+        fn succeeds() {
+            const PERMIT: NFTPermitValues = NFTPermitValues {
+                spender: MOCK_SPENDER,
+                tokenId: uint!(1_U256),
+                deadline: uint!(123_U256),
+                nonce: uint!(1_U256),
+            };
+
+            const PERMIT_DATA: NFTPermitData = get_permit_data(PERMIT, MOCK_OWNER, 1);
+
+            assert_eq!(
+                PERMIT_DATA.domain.name,
+                Some("Uniswap V4 Positions NFT".into())
+            );
+            assert_eq!(PERMIT_DATA.domain.chain_id, Some(uint!(1_U256)));
+            assert_eq!(PERMIT_DATA.domain.verifying_contract, Some(MOCK_OWNER));
+            assert_eq!(PERMIT_DATA.values, PERMIT);
+
+            // Compute the type hash by hashing the encoded type
+            // ref https://github.com/Uniswap/v3-periphery/blob/main/contracts/base/ERC721Permit.sol
+            assert_eq!(
+                PERMIT.eip712_type_hash(),
+                b256!("49ecf333e5b8c95c40fdafc95c1ad136e8914a8fb55e9dc8bb01eaa83a2df9ad")
+            );
+        }
     }
 }

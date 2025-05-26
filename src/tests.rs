@@ -1,5 +1,6 @@
 use crate::entities::Pool;
 pub(crate) use alloc::vec;
+use alloy_primitives::U160;
 use once_cell::sync::Lazy;
 use uniswap_sdk_core::{prelude::*, token};
 use uniswap_v3_sdk::prelude::*;
@@ -68,7 +69,7 @@ pub(crate) static USDC_DAI: Lazy<Pool> = Lazy::new(|| {
         FeeAmount::LOWEST.into(),
         10,
         Address::ZERO,
-        encode_sqrt_ratio_x96(1, 1),
+        *SQRT_PRICE_1_1,
         0,
     )
     .unwrap()
@@ -80,13 +81,14 @@ pub(crate) static DAI_USDC: Lazy<Pool> = Lazy::new(|| {
         FeeAmount::LOWEST.into(),
         10,
         Address::ZERO,
-        encode_sqrt_ratio_x96(1, 1),
+        *SQRT_PRICE_1_1,
         0,
     )
     .unwrap()
 });
 
 pub(crate) const ONE_ETHER: u128 = 1_000_000_000_000_000_000;
+pub(crate) static SQRT_PRICE_1_1: Lazy<U160> = Lazy::new(|| encode_sqrt_ratio_x96(1, 1));
 
 pub(crate) static TICK_LIST: Lazy<Vec<Tick>> = Lazy::new(|| {
     vec![

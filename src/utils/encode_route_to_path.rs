@@ -84,7 +84,7 @@ mod tests {
             FeeAmount::MEDIUM.into(),
             10,
             Address::ZERO,
-            encode_sqrt_ratio_x96(1, 1),
+            *SQRT_PRICE_1_1,
             0,
         )
         .unwrap()
@@ -96,7 +96,7 @@ mod tests {
             FeeAmount::MEDIUM.into(),
             10,
             Address::ZERO,
-            encode_sqrt_ratio_x96(1, 1),
+            *SQRT_PRICE_1_1,
             0,
         )
         .unwrap()
@@ -108,7 +108,7 @@ mod tests {
             FeeAmount::MEDIUM.into(),
             10,
             Address::ZERO,
-            encode_sqrt_ratio_x96(1, 1),
+            *SQRT_PRICE_1_1,
             0,
         )
         .unwrap()
