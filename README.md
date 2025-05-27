@@ -7,7 +7,7 @@
 A Rust SDK for building applications on top of Uniswap V4. Rewrite of the
 TypeScript [V4 SDK](https://github.com/Uniswap/sdks).
 
-It is feature-complete but missing unit tests.
+It is feature-complete with matching unit tests.
 
 ## Features
 
@@ -38,7 +38,7 @@ The current MSRV (minimum supported rust version) is 1.83.
 Add the following to your `Cargo.toml` file:
 
 ```toml
-uniswap-v4-sdk = { version = "0.6.0", features = ["extensions", "std"] }
+uniswap-v4-sdk = { version = "0.8.0", features = ["extensions", "std"] }
 ```
 
 ### Usage
