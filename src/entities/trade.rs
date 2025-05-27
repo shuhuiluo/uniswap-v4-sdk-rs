@@ -846,6 +846,7 @@ mod tests {
     use num_integer::Roots;
     use num_traits::ToPrimitive;
     use once_cell::sync::Lazy;
+    use tokio::sync::OnceCell;
 
     fn v2_style_pool(
         reserve0: CurrencyAmount<Currency>,
@@ -1676,6 +1677,787 @@ mod tests {
                     "25.5"
                 );
             }
+        }
+    }
+
+    mod best_trade_exact_in {
+        use super::*;
+
+        #[tokio::test]
+        #[should_panic(expected = "POOLS")]
+        async fn throws_with_empty_pools() {
+            let _ = Trade::<Token, Token, NoTickDataProvider>::best_trade_exact_in(
+                vec![],
+                &currency_amount!(TOKEN0, 10000),
+                &TOKEN2.clone(),
+                BestTradeOptions::default(),
+                vec![],
+                None,
+                &mut vec![],
+            )
+            .await
+            .unwrap();
+        }
+
+        #[tokio::test]
+        #[should_panic(expected = "MAX_HOPS")]
+        async fn throws_with_max_hops_of_0() {
+            let _ = Trade::best_trade_exact_in(
+                vec![POOL_0_2.clone()],
+                &currency_amount!(TOKEN0, 10000),
+                &TOKEN2.clone(),
+                BestTradeOptions {
+                    max_hops: Some(0),
+                    ..Default::default()
+                },
+                vec![],
+                None,
+                &mut vec![],
+            )
+            .await
+            .unwrap();
+        }
+
+        #[tokio::test]
+        async fn provides_best_route() {
+            let mut result = vec![];
+            Trade::best_trade_exact_in(
+                vec![POOL_0_1.clone(), POOL_0_2.clone(), POOL_1_2.clone()],
+                &currency_amount!(TOKEN0, 10000),
+                &TOKEN2.clone(),
+                BestTradeOptions::default(),
+                vec![],
+                None,
+                &mut result,
+            )
+            .await
+            .unwrap();
+
+            assert_eq!(result.len(), 2);
+            assert_eq!(result[0].swaps[0].route.pools.len(), 1); // 0 -> 2 at 10:11
+            assert_eq!(
+                result[0].swaps[0].route.currency_path(),
+                vec![TOKEN0.clone().into(), TOKEN2.clone().into()]
+            );
+            assert_eq!(
+                result[0].input_amount().unwrap(),
+                currency_amount!(TOKEN0, 10000)
+            );
+            assert_eq!(
+                result[0].output_amount().unwrap(),
+                currency_amount!(TOKEN2, 9971)
+            );
+            assert_eq!(result[1].swaps[0].route.pools.len(), 2); // 0 -> 1 -> 2 at 12:12:10
+            assert_eq!(
+                result[1].swaps[0].route.currency_path(),
+                vec![
+                    TOKEN0.clone().into(),
+                    TOKEN1.clone().into(),
+                    TOKEN2.clone().into()
+                ]
+            );
+            assert_eq!(
+                result[1].input_amount().unwrap(),
+                currency_amount!(TOKEN0, 10000)
+            );
+            assert_eq!(
+                result[1].output_amount().unwrap(),
+                currency_amount!(TOKEN2, 7004)
+            );
+        }
+
+        #[tokio::test]
+        async fn respects_max_hops() {
+            let mut result = vec![];
+            Trade::best_trade_exact_in(
+                vec![POOL_0_1.clone(), POOL_0_2.clone(), POOL_1_2.clone()],
+                &currency_amount!(TOKEN0, 10),
+                &TOKEN2.clone(),
+                BestTradeOptions {
+                    max_hops: Some(1),
+                    ..Default::default()
+                },
+                vec![],
+                None,
+                &mut result,
+            )
+            .await
+            .unwrap();
+
+            assert_eq!(result.len(), 1);
+            assert_eq!(result[0].swaps[0].route.pools.len(), 1); // 0 -> 2 at 10:11
+            assert_eq!(
+                result[0].swaps[0].route.currency_path(),
+                vec![TOKEN0.clone().into(), TOKEN2.clone().into()]
+            );
+        }
+
+        #[tokio::test]
+        async fn insufficient_input_for_one_pool() {
+            let mut result = vec![];
+            Trade::best_trade_exact_in(
+                vec![POOL_0_1.clone(), POOL_0_2.clone(), POOL_1_2.clone()],
+                &currency_amount!(TOKEN0, 1),
+                &TOKEN2.clone(),
+                BestTradeOptions::default(),
+                vec![],
+                None,
+                &mut result,
+            )
+            .await
+            .unwrap();
+
+            assert_eq!(result.len(), 2);
+            assert_eq!(result[0].swaps[0].route.pools.len(), 1); // 0 -> 2 at 10:11
+            assert_eq!(
+                result[0].swaps[0].route.currency_path(),
+                vec![TOKEN0.clone().into(), TOKEN2.clone().into()]
+            );
+            assert_eq!(
+                result[0].output_amount().unwrap(),
+                currency_amount!(TOKEN2, 0)
+            );
+        }
+
+        #[tokio::test]
+        async fn respects_max_num_results() {
+            let mut result = vec![];
+            Trade::best_trade_exact_in(
+                vec![POOL_0_1.clone(), POOL_0_2.clone(), POOL_1_2.clone()],
+                &currency_amount!(TOKEN0, 10),
+                &TOKEN2.clone(),
+                BestTradeOptions {
+                    max_num_results: Some(1),
+                    ..Default::default()
+                },
+                vec![],
+                None,
+                &mut result,
+            )
+            .await
+            .unwrap();
+
+            assert_eq!(result.len(), 1);
+        }
+
+        #[tokio::test]
+        async fn no_path() {
+            let mut result = vec![];
+            Trade::best_trade_exact_in(
+                vec![POOL_0_1.clone(), POOL_0_3.clone(), POOL_1_3.clone()],
+                &currency_amount!(TOKEN0, 10),
+                &TOKEN2.clone(),
+                BestTradeOptions::default(),
+                vec![],
+                None,
+                &mut result,
+            )
+            .await
+            .unwrap();
+
+            assert_eq!(result.len(), 0);
+        }
+
+        #[tokio::test]
+        async fn works_for_ether_currency_input() {
+            let mut result = vec![];
+            Trade::best_trade_exact_in(
+                vec![
+                    POOL_ETH_0.clone(),
+                    POOL_0_1.clone(),
+                    POOL_0_3.clone(),
+                    POOL_1_3.clone(),
+                ],
+                &currency_amount!(ETHER, 100),
+                &TOKEN3.clone(),
+                BestTradeOptions::default(),
+                vec![],
+                None,
+                &mut result,
+            )
+            .await
+            .unwrap();
+
+            assert_eq!(result.len(), 2);
+            assert_eq!(result[0].input_currency().clone(), ETHER.clone());
+            assert_eq!(
+                result[0].swaps[0].route.currency_path(),
+                vec![
+                    ETHER.clone().into(),
+                    TOKEN0.clone().into(),
+                    TOKEN1.clone().into(),
+                    TOKEN3.clone().into()
+                ]
+            );
+            assert_eq!(result[0].output_currency().clone(), TOKEN3.clone());
+            assert_eq!(result[1].input_currency().clone(), ETHER.clone());
+            assert_eq!(
+                result[1].swaps[0].route.currency_path(),
+                vec![
+                    ETHER.clone().into(),
+                    TOKEN0.clone().into(),
+                    TOKEN3.clone().into()
+                ]
+            );
+            assert_eq!(result[1].output_currency().clone(), TOKEN3.clone());
+        }
+
+        #[tokio::test]
+        async fn works_for_ether_currency_output() {
+            let mut result = vec![];
+            Trade::best_trade_exact_in(
+                vec![
+                    POOL_ETH_0.clone(),
+                    POOL_0_1.clone(),
+                    POOL_0_3.clone(),
+                    POOL_1_3.clone(),
+                ],
+                &currency_amount!(TOKEN3, 100),
+                &ETHER.clone(),
+                BestTradeOptions::default(),
+                vec![],
+                None,
+                &mut result,
+            )
+            .await
+            .unwrap();
+
+            assert_eq!(result.len(), 2);
+            assert_eq!(result[0].input_currency().clone(), TOKEN3.clone());
+            assert_eq!(
+                result[0].swaps[0].route.currency_path(),
+                vec![
+                    TOKEN3.clone().into(),
+                    TOKEN0.clone().into(),
+                    ETHER.clone().into()
+                ]
+            );
+            assert_eq!(result[0].output_currency().clone(), ETHER.clone());
+            assert_eq!(result[1].input_currency().clone(), TOKEN3.clone());
+            assert_eq!(
+                result[1].swaps[0].route.currency_path(),
+                vec![
+                    TOKEN3.clone().into(),
+                    TOKEN1.clone().into(),
+                    TOKEN0.clone().into(),
+                    ETHER.clone().into()
+                ]
+            );
+            assert_eq!(result[1].output_currency().clone(), ETHER.clone());
+        }
+    }
+
+    mod maximum_amount_in {
+        use super::*;
+
+        mod exact_input {
+            use super::*;
+
+            static EXACT_IN: OnceCell<Trade<Token, Token, TickListDataProvider>> =
+                OnceCell::const_new();
+
+            async fn get_exact_in() -> &'static Trade<Token, Token, TickListDataProvider> {
+                EXACT_IN
+                    .get_or_init(|| async {
+                        trade_from_route!(
+                            create_route!(POOL_0_1, POOL_1_2; TOKEN0, TOKEN2),
+                            currency_amount!(TOKEN0, 100),
+                            TradeType::ExactInput
+                        )
+                    })
+                    .await
+            }
+
+            #[tokio::test]
+            #[should_panic(expected = "SLIPPAGE_TOLERANCE")]
+            async fn throws_if_less_than_0() {
+                let trade = get_exact_in().await;
+                let _ = trade.maximum_amount_in(Percent::new(-1, 100), None);
+            }
+
+            #[tokio::test]
+            async fn returns_exact_if_0() {
+                let trade = get_exact_in().await;
+                assert_eq!(
+                    trade.maximum_amount_in(Percent::new(0, 100), None).unwrap(),
+                    trade.input_amount().unwrap()
+                );
+            }
+
+            #[tokio::test]
+            async fn returns_exact_if_nonzero() {
+                let trade = get_exact_in().await;
+                assert_eq!(
+                    trade.maximum_amount_in(Percent::new(0, 100), None).unwrap(),
+                    currency_amount!(TOKEN0, 100)
+                );
+                assert_eq!(
+                    trade.maximum_amount_in(Percent::new(5, 100), None).unwrap(),
+                    currency_amount!(TOKEN0, 100)
+                );
+                assert_eq!(
+                    trade
+                        .maximum_amount_in(Percent::new(200, 100), None)
+                        .unwrap(),
+                    currency_amount!(TOKEN0, 100)
+                );
+            }
+        }
+
+        mod exact_output {
+            use super::*;
+
+            static EXACT_OUT: OnceCell<Trade<Token, Token, TickListDataProvider>> =
+                OnceCell::const_new();
+
+            async fn get_exact_out() -> &'static Trade<Token, Token, TickListDataProvider> {
+                EXACT_OUT
+                    .get_or_init(|| async {
+                        trade_from_route!(
+                            create_route!(POOL_0_1, POOL_1_2; TOKEN0, TOKEN2),
+                            currency_amount!(TOKEN2, 10000),
+                            TradeType::ExactOutput
+                        )
+                    })
+                    .await
+            }
+
+            #[tokio::test]
+            #[should_panic(expected = "SLIPPAGE_TOLERANCE")]
+            async fn throws_if_less_than_0() {
+                let trade = get_exact_out().await;
+                let _ = trade.maximum_amount_in(Percent::new(-1, 10000), None);
+            }
+
+            #[tokio::test]
+            async fn returns_exact_if_0() {
+                let trade = get_exact_out().await;
+                assert_eq!(
+                    trade
+                        .maximum_amount_in(Percent::new(0, 10000), None)
+                        .unwrap(),
+                    trade.input_amount().unwrap()
+                );
+            }
+
+            #[tokio::test]
+            async fn returns_exact_if_nonzero() {
+                let trade = get_exact_out().await;
+                assert_eq!(
+                    trade
+                        .maximum_amount_in(Percent::new(0, 10000), None)
+                        .unwrap(),
+                    currency_amount!(TOKEN0, 15488)
+                );
+                assert_eq!(
+                    trade.maximum_amount_in(Percent::new(5, 100), None).unwrap(),
+                    CurrencyAmount::from_fractional_amount(TOKEN0.clone(), 1626240, 100).unwrap()
+                );
+                assert_eq!(
+                    trade
+                        .maximum_amount_in(Percent::new(200, 100), None)
+                        .unwrap(),
+                    currency_amount!(TOKEN0, 46464)
+                );
+            }
+        }
+    }
+
+    mod minimum_amount_out {
+        use super::*;
+
+        mod exact_input {
+            use super::*;
+
+            static EXACT_IN: OnceCell<Trade<Token, Token, TickListDataProvider>> =
+                OnceCell::const_new();
+
+            async fn get_exact_in() -> &'static Trade<Token, Token, TickListDataProvider> {
+                EXACT_IN
+                    .get_or_init(|| async {
+                        trade_from_route!(
+                            create_route!(POOL_0_1, POOL_1_2; TOKEN0, TOKEN2),
+                            currency_amount!(TOKEN0, 10000),
+                            TradeType::ExactInput
+                        )
+                    })
+                    .await
+            }
+
+            #[tokio::test]
+            #[should_panic(expected = "SLIPPAGE_TOLERANCE")]
+            async fn throws_if_less_than_0() {
+                let trade = get_exact_in().await;
+                let _ = trade.minimum_amount_out(Percent::new(-1, 100), None);
+            }
+
+            #[tokio::test]
+            async fn returns_exact_if_0() {
+                let trade = get_exact_in().await;
+                assert_eq!(
+                    trade
+                        .minimum_amount_out(Percent::new(0, 10000), None)
+                        .unwrap(),
+                    trade.output_amount().unwrap()
+                );
+            }
+
+            #[tokio::test]
+            async fn returns_exact_if_nonzero() {
+                let trade = get_exact_in().await;
+                assert_eq!(
+                    trade
+                        .minimum_amount_out(Percent::new(0, 100), None)
+                        .unwrap(),
+                    currency_amount!(TOKEN2, 7004)
+                );
+                assert_eq!(
+                    trade
+                        .minimum_amount_out(Percent::new(5, 100), None)
+                        .unwrap(),
+                    CurrencyAmount::from_fractional_amount(TOKEN2.clone(), 700400, 105).unwrap()
+                );
+                assert_eq!(
+                    trade
+                        .minimum_amount_out(Percent::new(200, 100), None)
+                        .unwrap(),
+                    CurrencyAmount::from_fractional_amount(TOKEN2.clone(), 700400, 300).unwrap()
+                );
+            }
+        }
+
+        mod exact_output {
+            use super::*;
+
+            static EXACT_OUT: OnceCell<Trade<Token, Token, TickListDataProvider>> =
+                OnceCell::const_new();
+
+            async fn get_exact_out() -> &'static Trade<Token, Token, TickListDataProvider> {
+                EXACT_OUT
+                    .get_or_init(|| async {
+                        trade_from_route!(
+                            create_route!(POOL_0_1, POOL_1_2; TOKEN0, TOKEN2),
+                            currency_amount!(TOKEN2, 100),
+                            TradeType::ExactOutput
+                        )
+                    })
+                    .await
+            }
+
+            #[tokio::test]
+            #[should_panic(expected = "SLIPPAGE_TOLERANCE")]
+            async fn throws_if_less_than_0() {
+                let trade = get_exact_out().await;
+                let _ = trade.minimum_amount_out(Percent::new(-1, 100), None);
+            }
+
+            #[tokio::test]
+            async fn returns_exact_if_0() {
+                let trade = get_exact_out().await;
+                assert_eq!(
+                    trade
+                        .minimum_amount_out(Percent::new(0, 100), None)
+                        .unwrap(),
+                    trade.output_amount().unwrap()
+                );
+            }
+
+            #[tokio::test]
+            async fn returns_exact_if_nonzero() {
+                let trade = get_exact_out().await;
+                assert_eq!(
+                    trade
+                        .minimum_amount_out(Percent::new(0, 100), None)
+                        .unwrap(),
+                    currency_amount!(TOKEN2, 100)
+                );
+                assert_eq!(
+                    trade
+                        .minimum_amount_out(Percent::new(5, 100), None)
+                        .unwrap(),
+                    currency_amount!(TOKEN2, 100)
+                );
+                assert_eq!(
+                    trade
+                        .minimum_amount_out(Percent::new(200, 100), None)
+                        .unwrap(),
+                    currency_amount!(TOKEN2, 100)
+                );
+            }
+        }
+    }
+
+    mod best_trade_exact_out {
+        use super::*;
+
+        #[tokio::test]
+        #[should_panic(expected = "POOLS")]
+        async fn throws_with_empty_pools() {
+            let _ = Trade::<Token, Token, NoTickDataProvider>::best_trade_exact_out(
+                vec![],
+                &TOKEN0.clone(),
+                &currency_amount!(TOKEN2, 100),
+                BestTradeOptions::default(),
+                vec![],
+                None,
+                &mut vec![],
+            )
+            .await
+            .unwrap();
+        }
+
+        #[tokio::test]
+        #[should_panic(expected = "MAX_HOPS")]
+        async fn throws_with_max_hops_of_0() {
+            let _ = Trade::best_trade_exact_out(
+                vec![POOL_0_2.clone()],
+                &TOKEN0.clone(),
+                &currency_amount!(TOKEN2, 100),
+                BestTradeOptions {
+                    max_hops: Some(0),
+                    ..Default::default()
+                },
+                vec![],
+                None,
+                &mut vec![],
+            )
+            .await
+            .unwrap();
+        }
+
+        #[tokio::test]
+        async fn provides_best_route() {
+            let mut result = vec![];
+            Trade::best_trade_exact_out(
+                vec![POOL_0_1.clone(), POOL_0_2.clone(), POOL_1_2.clone()],
+                &TOKEN0.clone(),
+                &currency_amount!(TOKEN2, 10000),
+                BestTradeOptions::default(),
+                vec![],
+                None,
+                &mut result,
+            )
+            .await
+            .unwrap();
+
+            assert_eq!(result.len(), 2);
+            assert_eq!(result[0].swaps[0].route.pools.len(), 1); // 0 -> 2 at 10:11
+            assert_eq!(
+                result[0].swaps[0].route.currency_path(),
+                vec![TOKEN0.clone().into(), TOKEN2.clone().into()]
+            );
+            assert_eq!(
+                result[0].input_amount().unwrap(),
+                currency_amount!(TOKEN0, 10032)
+            );
+            assert_eq!(
+                result[0].output_amount().unwrap(),
+                currency_amount!(TOKEN2, 10000)
+            );
+            assert_eq!(result[1].swaps[0].route.pools.len(), 2); // 0 -> 1 -> 2 at 12:12:10
+            assert_eq!(
+                result[1].swaps[0].route.currency_path(),
+                vec![
+                    TOKEN0.clone().into(),
+                    TOKEN1.clone().into(),
+                    TOKEN2.clone().into()
+                ]
+            );
+            assert_eq!(
+                result[1].input_amount().unwrap(),
+                currency_amount!(TOKEN0, 15488)
+            );
+            assert_eq!(
+                result[1].output_amount().unwrap(),
+                currency_amount!(TOKEN2, 10000)
+            );
+        }
+
+        #[tokio::test]
+        async fn respects_max_hops() {
+            let mut result = vec![];
+            Trade::best_trade_exact_out(
+                vec![POOL_0_1.clone(), POOL_0_2.clone(), POOL_1_2.clone()],
+                &TOKEN0.clone(),
+                &currency_amount!(TOKEN2, 10),
+                BestTradeOptions {
+                    max_hops: Some(1),
+                    ..Default::default()
+                },
+                vec![],
+                None,
+                &mut result,
+            )
+            .await
+            .unwrap();
+
+            assert_eq!(result.len(), 1);
+            assert_eq!(result[0].swaps[0].route.pools.len(), 1); // 0 -> 2 at 10:11
+            assert_eq!(
+                result[0].swaps[0].route.currency_path(),
+                vec![TOKEN0.clone().into(), TOKEN2.clone().into()]
+            );
+        }
+
+        #[tokio::test]
+        async fn insufficient_liquidity() {
+            let result = &mut vec![];
+            Trade::best_trade_exact_out(
+                vec![POOL_0_1.clone(), POOL_0_2.clone(), POOL_1_2.clone()],
+                &TOKEN0.clone(),
+                &currency_amount!(TOKEN2, 120000),
+                BestTradeOptions::default(),
+                vec![],
+                None,
+                result,
+            )
+            .await
+            .unwrap();
+            assert_eq!(result.len(), 0);
+        }
+
+        #[tokio::test]
+        async fn insufficient_liquidity_in_one_pool_but_not_the_other() {
+            let result = &mut vec![];
+            Trade::best_trade_exact_out(
+                vec![POOL_0_1.clone(), POOL_0_2.clone(), POOL_1_2.clone()],
+                &TOKEN0.clone(),
+                &currency_amount!(TOKEN2, 105000),
+                BestTradeOptions::default(),
+                vec![],
+                None,
+                result,
+            )
+            .await
+            .unwrap();
+            assert_eq!(result.len(), 1);
+        }
+
+        #[tokio::test]
+        async fn respects_max_num_results() {
+            let mut result = vec![];
+            Trade::best_trade_exact_out(
+                vec![POOL_0_1.clone(), POOL_0_2.clone(), POOL_1_2.clone()],
+                &TOKEN0.clone(),
+                &currency_amount!(TOKEN2, 10),
+                BestTradeOptions {
+                    max_num_results: Some(1),
+                    ..Default::default()
+                },
+                vec![],
+                None,
+                &mut result,
+            )
+            .await
+            .unwrap();
+
+            assert_eq!(result.len(), 1);
+        }
+
+        #[tokio::test]
+        async fn no_path() {
+            let mut result = vec![];
+            Trade::best_trade_exact_out(
+                vec![POOL_0_1.clone(), POOL_0_3.clone(), POOL_1_3.clone()],
+                &TOKEN0.clone(),
+                &currency_amount!(TOKEN2, 10),
+                BestTradeOptions::default(),
+                vec![],
+                None,
+                &mut result,
+            )
+            .await
+            .unwrap();
+
+            assert_eq!(result.len(), 0);
+        }
+
+        #[tokio::test]
+        async fn works_for_ether_currency_input() {
+            let mut result = vec![];
+            Trade::best_trade_exact_out(
+                vec![
+                    POOL_ETH_0.clone(),
+                    POOL_0_1.clone(),
+                    POOL_0_3.clone(),
+                    POOL_1_3.clone(),
+                ],
+                &ETHER.clone(),
+                &currency_amount!(TOKEN3, 10000),
+                BestTradeOptions::default(),
+                vec![],
+                None,
+                &mut result,
+            )
+            .await
+            .unwrap();
+
+            assert_eq!(result.len(), 2);
+            assert_eq!(result[0].input_currency().clone(), ETHER.clone());
+            assert_eq!(
+                result[0].swaps[0].route.currency_path(),
+                vec![
+                    ETHER.clone().into(),
+                    TOKEN0.clone().into(),
+                    TOKEN1.clone().into(),
+                    TOKEN3.clone().into()
+                ]
+            );
+            assert_eq!(result[0].output_currency().clone(), TOKEN3.clone());
+            assert_eq!(result[1].input_currency().clone(), ETHER.clone());
+            assert_eq!(
+                result[1].swaps[0].route.currency_path(),
+                vec![
+                    ETHER.clone().into(),
+                    TOKEN0.clone().into(),
+                    TOKEN3.clone().into()
+                ]
+            );
+            assert_eq!(result[1].output_currency().clone(), TOKEN3.clone());
+        }
+
+        #[tokio::test]
+        async fn works_for_ether_currency_output() {
+            let mut result = vec![];
+            Trade::best_trade_exact_out(
+                vec![
+                    POOL_ETH_0.clone(),
+                    POOL_0_1.clone(),
+                    POOL_0_3.clone(),
+                    POOL_1_3.clone(),
+                ],
+                &TOKEN3.clone(),
+                &currency_amount!(ETHER, 100),
+                BestTradeOptions::default(),
+                vec![],
+                None,
+                &mut result,
+            )
+            .await
+            .unwrap();
+
+            assert_eq!(result.len(), 2);
+            assert_eq!(result[0].input_currency().clone(), TOKEN3.clone());
+            assert_eq!(
+                result[0].swaps[0].route.currency_path(),
+                vec![
+                    TOKEN3.clone().into(),
+                    TOKEN0.clone().into(),
+                    ETHER.clone().into()
+                ]
+            );
+            assert_eq!(result[0].output_currency().clone(), ETHER.clone());
+            assert_eq!(result[1].input_currency().clone(), TOKEN3.clone());
+            assert_eq!(
+                result[1].swaps[0].route.currency_path(),
+                vec![
+                    TOKEN3.clone().into(),
+                    TOKEN1.clone().into(),
+                    TOKEN0.clone().into(),
+                    ETHER.clone().into()
+                ]
+            );
+            assert_eq!(result[1].output_currency().clone(), ETHER.clone());
         }
     }
 }
