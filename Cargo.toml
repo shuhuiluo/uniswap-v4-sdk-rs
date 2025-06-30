@@ -26,7 +26,7 @@ uniswap-sdk-core = "5.1.0"
 uniswap-v3-sdk = "5.0.0"
 
 [dev-dependencies]
-alloy = { version = "1.0.1", default-features = false, features = ["reqwest", "signer-local"] }
+alloy = { version = "1.0.1", default-features = false, features = ["provider-anvil-node", "reqwest", "signer-local"] }
 dotenv = "0.15"
 num-integer = { version = "0.1", default-features = false }
 once_cell = "1.21"
@@ -45,3 +45,7 @@ extensions = [
     "alloy",
     "uniswap-v3-sdk/extensions"
 ]
+
+[[example]]
+name = "mint_position_basic"
+required-features = ["extensions"]
