@@ -70,13 +70,12 @@ cargo run --example mint_position_permit2 --features extensions
 
 ### Testing Setup
 
-All examples use Anvil forking to create a local testnet that mirrors mainnet state:
+All examples use Anvil forking to create a local testnet that mirrors the mainnet state:
 
 - Fork from a recent mainnet block
 - Create test accounts with ETH balances
 - Set up token balances and approvals
 - Execute transactions in the forked environment
-
 ## Common Patterns
 
 - Use `uniswap_v4_sdk::prelude::*` for easy imports
