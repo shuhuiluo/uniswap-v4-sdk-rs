@@ -54,23 +54,23 @@ impl Actions {
     #[inline]
     pub fn abi_encode(&self) -> Bytes {
         match self {
-            Self::INCREASE_LIQUIDITY(params) => params.abi_encode(),
-            Self::DECREASE_LIQUIDITY(params) => params.abi_encode(),
-            Self::MINT_POSITION(params) => params.abi_encode(),
-            Self::BURN_POSITION(params) => params.abi_encode(),
+            Self::INCREASE_LIQUIDITY(params) => params.abi_encode_params(),
+            Self::DECREASE_LIQUIDITY(params) => params.abi_encode_params(),
+            Self::MINT_POSITION(params) => params.abi_encode_params(),
+            Self::BURN_POSITION(params) => params.abi_encode_params(),
             Self::SWAP_EXACT_IN_SINGLE(params) => params.abi_encode(),
             Self::SWAP_EXACT_IN(params) => params.abi_encode(),
             Self::SWAP_EXACT_OUT_SINGLE(params) => params.abi_encode(),
             Self::SWAP_EXACT_OUT(params) => params.abi_encode(),
-            Self::SETTLE(params) => params.abi_encode(),
-            Self::SETTLE_ALL(params) => params.abi_encode(),
-            Self::SETTLE_PAIR(params) => params.abi_encode(),
-            Self::TAKE(params) => params.abi_encode(),
-            Self::TAKE_ALL(params) => params.abi_encode(),
-            Self::TAKE_PORTION(params) => params.abi_encode(),
-            Self::TAKE_PAIR(params) => params.abi_encode(),
+            Self::SETTLE(params) => params.abi_encode_params(),
+            Self::SETTLE_ALL(params) => params.abi_encode_params(),
+            Self::SETTLE_PAIR(params) => params.abi_encode_params(),
+            Self::TAKE(params) => params.abi_encode_params(),
+            Self::TAKE_ALL(params) => params.abi_encode_params(),
+            Self::TAKE_PORTION(params) => params.abi_encode_params(),
+            Self::TAKE_PAIR(params) => params.abi_encode_params(),
             Self::CLOSE_CURRENCY(params) => params.abi_encode(),
-            Self::SWEEP(params) => params.abi_encode(),
+            Self::SWEEP(params) => params.abi_encode_params(),
             Self::UNWRAP(params) => params.abi_encode(),
         }
         .into()
@@ -80,25 +80,29 @@ impl Actions {
     pub fn abi_decode(command: u8, data: &Bytes) -> Result<Self, Error> {
         let data = data.iter().as_slice();
         Ok(match command {
-            0x00 => Self::INCREASE_LIQUIDITY(IncreaseLiquidityParams::abi_decode_validate(data)?),
-            0x01 => Self::DECREASE_LIQUIDITY(DecreaseLiquidityParams::abi_decode_validate(data)?),
-            0x02 => Self::MINT_POSITION(MintPositionParams::abi_decode_validate(data)?),
-            0x03 => Self::BURN_POSITION(BurnPositionParams::abi_decode_validate(data)?),
+            0x00 => {
+                Self::INCREASE_LIQUIDITY(IncreaseLiquidityParams::abi_decode_params_validate(data)?)
+            }
+            0x01 => {
+                Self::DECREASE_LIQUIDITY(DecreaseLiquidityParams::abi_decode_params_validate(data)?)
+            }
+            0x02 => Self::MINT_POSITION(MintPositionParams::abi_decode_params_validate(data)?),
+            0x03 => Self::BURN_POSITION(BurnPositionParams::abi_decode_params_validate(data)?),
             0x06 => Self::SWAP_EXACT_IN_SINGLE(SwapExactInSingleParams::abi_decode_validate(data)?),
             0x07 => Self::SWAP_EXACT_IN(SwapExactInParams::abi_decode_validate(data)?),
             0x08 => {
                 Self::SWAP_EXACT_OUT_SINGLE(SwapExactOutSingleParams::abi_decode_validate(data)?)
             }
             0x09 => Self::SWAP_EXACT_OUT(SwapExactOutParams::abi_decode_validate(data)?),
-            0x0b => Self::SETTLE(SettleParams::abi_decode_validate(data)?),
-            0x0c => Self::SETTLE_ALL(SettleAllParams::abi_decode_validate(data)?),
-            0x0d => Self::SETTLE_PAIR(SettlePairParams::abi_decode_validate(data)?),
-            0x0e => Self::TAKE(TakeParams::abi_decode_validate(data)?),
-            0x0f => Self::TAKE_ALL(TakeAllParams::abi_decode_validate(data)?),
-            0x10 => Self::TAKE_PORTION(TakePortionParams::abi_decode_validate(data)?),
-            0x11 => Self::TAKE_PAIR(TakePairParams::abi_decode_validate(data)?),
+            0x0b => Self::SETTLE(SettleParams::abi_decode_params_validate(data)?),
+            0x0c => Self::SETTLE_ALL(SettleAllParams::abi_decode_params_validate(data)?),
+            0x0d => Self::SETTLE_PAIR(SettlePairParams::abi_decode_params_validate(data)?),
+            0x0e => Self::TAKE(TakeParams::abi_decode_params_validate(data)?),
+            0x0f => Self::TAKE_ALL(TakeAllParams::abi_decode_params_validate(data)?),
+            0x10 => Self::TAKE_PORTION(TakePortionParams::abi_decode_params_validate(data)?),
+            0x11 => Self::TAKE_PAIR(TakePairParams::abi_decode_params_validate(data)?),
             0x12 => Self::CLOSE_CURRENCY(Address::abi_decode_validate(data)?),
-            0x14 => Self::SWEEP(SweepParams::abi_decode_validate(data)?),
+            0x14 => Self::SWEEP(SweepParams::abi_decode_params_validate(data)?),
             0x16 => Self::UNWRAP(U256::abi_decode_validate(data)?),
             _ => return Err(Error::InvalidAction(command)),
         })
@@ -221,7 +225,7 @@ impl V4Planner {
             actions: self.actions.into(),
             params: self.params,
         }
-        .abi_encode()
+        .abi_encode_params()
         .into()
     }
 }
@@ -237,8 +241,8 @@ fn currency_address(currency: &impl BaseCurrency) -> Address {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{currency_amount, prelude::Pool, tests::*};
-    use alloy_primitives::hex;
+    use crate::{prelude::Pool, tests::*};
+    use alloy_primitives::{hex, uint};
     use once_cell::sync::Lazy;
 
     static USDC_WETH: Lazy<Pool<Vec<Tick>>> = Lazy::new(|| {
@@ -352,7 +356,6 @@ mod tests {
 
     mod add_settle {
         use super::*;
-        use alloy_primitives::uint;
 
         #[test]
         fn completes_v4_settle_without_specified_amount() {
@@ -425,7 +428,6 @@ mod tests {
 
     mod add_unwrap {
         use super::*;
-        use alloy_primitives::uint;
 
         #[test]
         fn completes_v4_unwrap() {
@@ -441,7 +443,7 @@ mod tests {
 
     mod add_trade {
         use super::*;
-        use crate::{create_route, trade_from_route};
+        use crate::{create_route, currency_amount, trade_from_route};
 
         #[tokio::test]
         async fn completes_v4_exact_in_2_hop_swap_same_results_as_add_action() {
