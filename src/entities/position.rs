@@ -408,7 +408,7 @@ impl<TP: TickDataProvider> Position<TP> {
         slippage_tolerance: &Percent,
         spender: Address,
         nonce: U256,
-        deadline: U256,
+        deadline: U48,
     ) -> Result<AllowanceTransferPermitBatch, Error> {
         let MintAmounts { amount0, amount1 } =
             self.mint_amounts_with_slippage(slippage_tolerance)?;
@@ -417,18 +417,18 @@ impl<TP: TickDataProvider> Position<TP> {
                 IAllowanceTransfer::PermitDetails {
                     token: self.pool.currency0.wrapped().address(),
                     amount: U160::from(amount0),
-                    expiration: U48::from(deadline),
+                    expiration: deadline,
                     nonce: U48::from(nonce),
                 },
                 IAllowanceTransfer::PermitDetails {
                     token: self.pool.currency1.wrapped().address(),
                     amount: U160::from(amount1),
-                    expiration: U48::from(deadline),
+                    expiration: deadline,
                     nonce: U48::from(nonce),
                 },
             ],
             spender,
-            sigDeadline: deadline,
+            sigDeadline: U256::from(deadline),
         })
     }
 
