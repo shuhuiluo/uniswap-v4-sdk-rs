@@ -21,6 +21,8 @@ alloy-primitives = { version = "1.0", default-features = false }
 alloy-sol-types = { version = "1.0", default-features = false }
 derive_more = { version = "2", default-features = false, features = ["deref", "deref_mut", "from"] }
 num-traits = { version = "0.2", default-features = false, features = ["libm"] }
+once_cell = { version = "1.21", optional = true }
+dotenv = { version = "0.15", optional = true }
 thiserror = { version = "2", default-features = false }
 uniswap-sdk-core = "5.1.0"
 uniswap-v3-sdk = "5.0.0"
@@ -45,7 +47,16 @@ extensions = [
     "alloy",
     "uniswap-v3-sdk/extensions"
 ]
+test-utils = [
+    "dotenv",
+    "once_cell",
+    "std"
+]
 
 [[example]]
 name = "mint_position_basic"
-required-features = ["extensions"]
+required-features = ["extensions", "test-utils"]
+
+[[example]]
+name = "mint_position_permit2"
+required-features = ["extensions", "test-utils"]

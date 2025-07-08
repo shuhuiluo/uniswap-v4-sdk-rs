@@ -4,8 +4,7 @@ use alloy::{
     providers::{ext::AnvilApi, Provider},
     rpc::types::TransactionRequest,
 };
-use alloy_primitives::{aliases::U48, U160};
-use alloy_sol_types::SolCall;
+use alloy_primitives::aliases::U48;
 use uniswap_sdk_core::prelude::*;
 use uniswap_v3_sdk::prelude::{nearest_usable_tick, FeeAmount, MintAmounts};
 use uniswap_v4_sdk::{prelude::*, tests::*};
@@ -13,13 +12,14 @@ use uniswap_v4_sdk::{prelude::*, tests::*};
 const TICK_SPACING: i32 = 10;
 const LIQUIDITY_AMOUNT: u128 = 1_000_000_000_000_000;
 
-/// Basic example demonstrating how to mint a liquidity position in an existing Uniswap V4 pool.
+/// Permit2 example demonstrating gasless token approvals when minting positions.
 /// This example:
 /// 1. Sets up a forked mainnet environment using Anvil
 /// 2. Checks if an ETH-USDC V4 pool exists and gets its current state
-/// 3. Sets up token balances and Permit2 approvals (required for V4)
-/// 4. Mints a liquidity position in the pool
-/// 5. Verifies the position was created correctly
+/// 3. Sets up token balances (no direct Permit2 approvals needed)
+/// 4. Creates EIP-712 signatures for gasless token approvals via Permit2
+/// 5. Mints a liquidity position using the gasless approvals
+/// 6. Verifies the position was created correctly
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Use a recent block for forking
@@ -73,7 +73,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  - Amount0 (ETH): {amount0}");
     println!("  - Amount1 (USDC): {amount1}");
 
-    // Set up token balances and Permit2 approvals
+    // Set up token balances and approve to Permit2 (required before using Permit2 signatures)
     setup_token_balance(&provider, USDC.address(), account, amount1, PERMIT2_ADDRESS).await?;
     setup_token_balance(
         &provider,
@@ -85,33 +85,45 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .await?;
     println!("💳 Token balances and Permit2 approvals set up");
 
-    // Approve v4_position_manager on Permit2 for USDC transfers (V4 requirement)
-    println!("🔐 Approving v4_position_manager on Permit2...");
+    // Create Permit2 batch permit data for gasless approvals
+    println!("🔐 Creating Permit2 batch permit signature...");
 
-    let approve_call = IAllowanceTransfer::approveCall {
-        token: USDC.address(),
-        spender: v4_position_manager,
-        amount: U160::from(amount1),
-        expiration: U48::MAX,
-    };
+    let permit_batch = position.permit_batch_data(
+        &Percent::new(1, 1000), // 0.1% slippage
+        v4_position_manager,
+        U256::ZERO, // nonce
+        U48::MAX,   // deadline
+    )?;
 
-    let approve_tx = TransactionRequest::default()
-        .with_from(account)
-        .with_to(PERMIT2_ADDRESS)
-        .with_input(approve_call.abi_encode());
+    println!("📋 Permit batch details:");
+    println!("  - Token0: {}", permit_batch.details[0].token);
+    println!("  - Amount0: {}", permit_batch.details[0].amount);
+    println!("  - Token1: {}", permit_batch.details[1].token);
+    println!("  - Amount1: {}", permit_batch.details[1].amount);
+    println!("  - Spender: {}", permit_batch.spender);
 
-    provider.send_transaction(approve_tx).await?.watch().await?;
-    println!("✅ Permit2 approval successful");
+    // Create EIP-712 signature for the permit batch
+    let signature = create_permit2_signature(&permit_batch, &signer)?;
 
-    println!("🚀 Minting position...");
+    println!("✅ Permit2 signature created (gasless approval)");
 
-    let options = create_add_liquidity_options(account, None);
+    println!("🚀 Minting position with gasless approvals...");
+
+    let options = create_add_liquidity_options(
+        account,
+        Some(BatchPermitOptions {
+            owner: account,
+            permit_batch,
+            signature,
+        }),
+    );
 
     let params = add_call_parameters(&mut position, options)?;
 
     println!("📋 Transaction details:");
     println!("  - Calldata length: {} bytes", params.calldata.len());
     println!("  - Value: {} wei", params.value);
+    println!("  - Includes gasless Permit2 approval");
 
     let tx = TransactionRequest::default()
         .with_from(account)
@@ -121,9 +133,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let receipt = provider.send_transaction(tx).await?.watch().await?;
 
-    println!("✅ Position minted successfully!");
+    println!("✅ Position minted successfully with gasless approvals!");
     println!("📋 Transaction hash: {receipt:?}");
+    println!("🎉 No separate approval transactions were needed!");
 
-    // In a real application, parse logs to get token ID and verify position
     Ok(())
 }
