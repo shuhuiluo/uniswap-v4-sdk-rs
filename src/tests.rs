@@ -138,32 +138,18 @@ macro_rules! trade_from_route {
     };
 }
 
-#[cfg(all(feature = "extensions", feature = "test-utils"))]
-pub use extensions::*;
+#[cfg(feature = "extensions")]
+pub(crate) use extensions::*;
 
-#[cfg(all(feature = "extensions", feature = "test-utils"))]
+#[cfg(feature = "extensions")]
 mod extensions {
     use super::*;
-    use crate::{
-        position_manager::{AddLiquidityOptions, AddLiquiditySpecificOptions, MintSpecificOptions},
-        prelude::*,
-    };
-    use alloc::boxed::Box;
+    use crate::abi::IStateView;
     use alloy::{
         eips::{BlockId, BlockNumberOrTag},
-        providers::{
-            ext::AnvilApi,
-            fillers::{
-                BlobGasFiller, ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller,
-            },
-            layers::AnvilProvider,
-            Identity, Provider, ProviderBuilder, RootProvider,
-        },
-        signers::{local::PrivateKeySigner, SignerSync},
+        providers::{ProviderBuilder, RootProvider},
         transports::http::reqwest::Url,
     };
-    use alloy_primitives::{aliases::U24, Bytes, Signature, B256, U256};
-    use alloy_sol_types::{eip712_domain, Eip712Domain, SolStruct};
 
     pub(crate) static RPC_URL: Lazy<Url> = Lazy::new(|| {
         dotenv::dotenv().ok();
@@ -201,6 +187,32 @@ mod extensions {
                 PROVIDER.clone(),
             )
         });
+}
+
+#[cfg(all(feature = "extensions", feature = "test-utils"))]
+pub use examples::*;
+
+#[cfg(all(feature = "extensions", feature = "test-utils"))]
+mod examples {
+    use super::*;
+    use crate::{
+        position_manager::{AddLiquidityOptions, AddLiquiditySpecificOptions, MintSpecificOptions},
+        prelude::*,
+    };
+    use alloc::boxed::Box;
+    use alloy::{
+        providers::{
+            ext::AnvilApi,
+            fillers::{
+                BlobGasFiller, ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller,
+            },
+            layers::AnvilProvider,
+            Identity, Provider, ProviderBuilder, RootProvider,
+        },
+        signers::{local::PrivateKeySigner, SignerSync},
+    };
+    use alloy_primitives::{aliases::U24, Bytes, Signature, B256, U256};
+    use alloy_sol_types::{eip712_domain, Eip712Domain, SolStruct};
 
     /// Set up an Anvil fork from mainnet at a specific block
     #[inline]

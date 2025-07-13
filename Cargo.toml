@@ -48,6 +48,9 @@ extensions = [
     "uniswap-v3-sdk/extensions"
 ]
 test-utils = [
+    "alloy/provider-anvil-node",
+    "alloy/reqwest",
+    "alloy/signer-local",
     "dotenv",
     "once_cell",
     "std"
