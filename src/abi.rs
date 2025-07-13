@@ -214,7 +214,7 @@ alloy::sol! {
     }
 }
 
-#[cfg(all(test, feature = "extensions"))]
+#[cfg(feature = "extensions")]
 alloy::sol! {
     type PoolId is bytes32;
 
