@@ -146,7 +146,7 @@ mod extensions {
     use super::*;
     use crate::abi::IStateView;
     use alloy::{
-        eips::{BlockId, BlockNumberOrTag},
+        eips::BlockId,
         providers::{ProviderBuilder, RootProvider},
         transports::http::reqwest::Url,
     };
@@ -162,8 +162,7 @@ mod extensions {
             .connect_http(RPC_URL.clone())
     });
 
-    pub(crate) const BLOCK_ID: Option<BlockId> =
-        Some(BlockId::Number(BlockNumberOrTag::Number(22305544)));
+    pub(crate) const BLOCK_ID: Option<BlockId> = Some(BlockId::number(22305544));
 
     pub(crate) static POOL_ID_ETH_USDC: Lazy<B256> = Lazy::new(|| {
         Pool::get_pool_id(

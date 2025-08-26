@@ -6,7 +6,7 @@
 
 use crate::prelude::{Error, IExtsload};
 use alloy::{
-    eips::{BlockId, BlockNumberOrTag},
+    eips::BlockId,
     network::{Ethereum, Network},
     providers::Provider,
     uint,
@@ -41,10 +41,10 @@ fn get_tick_info_slot<I: TickIndex>(pool_id: B256, tick: I) -> U256 {
     U256::from_be_bytes(keccak256((tick.to_i24(), ticks_mapping_slot).abi_encode()).0)
 }
 
-fn get_position_info_slot(pool_id: B256, position_id: B256) -> U256 {
+fn get_position_info_slot(pool_id: B256, position_key: B256) -> U256 {
     let state_slot = get_pool_state_slot(pool_id);
     let position_mapping_slot = state_slot + POSITIONS_OFFSET;
-    U256::from_be_bytes(keccak256((position_id, position_mapping_slot).abi_encode()).0)
+    U256::from_be_bytes(keccak256((position_key, position_mapping_slot).abi_encode()).0)
 }
 
 /// A lens for querying Uniswap V4 pool manager
@@ -91,7 +91,7 @@ where
         pool_id: B256,
         block_id: Option<BlockId>,
     ) -> Result<(U160, I24, U24, U24), Error> {
-        let block_id = block_id.unwrap_or(BlockId::Number(BlockNumberOrTag::Latest));
+        let block_id = block_id.unwrap_or(BlockId::latest());
         let state_slot = get_pool_state_slot(pool_id);
         let data = self
             .manager
@@ -139,7 +139,7 @@ where
         tick: I,
         block_id: Option<BlockId>,
     ) -> Result<(u128, i128, U256, U256), Error> {
-        let block_id = block_id.unwrap_or(BlockId::Number(BlockNumberOrTag::Latest));
+        let block_id = block_id.unwrap_or(BlockId::latest());
         let slot = get_tick_info_slot(pool_id, tick);
         let data = self
             .manager
@@ -180,7 +180,7 @@ where
         tick: I,
         block_id: Option<BlockId>,
     ) -> Result<(u128, i128), Error> {
-        let block_id = block_id.unwrap_or(BlockId::Number(BlockNumberOrTag::Latest));
+        let block_id = block_id.unwrap_or(BlockId::latest());
         let slot = get_tick_info_slot(pool_id, tick);
         let value = self
             .manager
@@ -212,7 +212,7 @@ where
         tick: I,
         block_id: Option<BlockId>,
     ) -> Result<(U256, U256), Error> {
-        let block_id = block_id.unwrap_or(BlockId::Number(BlockNumberOrTag::Latest));
+        let block_id = block_id.unwrap_or(BlockId::latest());
         let slot = B256::from(get_tick_info_slot(pool_id, tick) + uint!(1_U256));
         let data = self
             .manager
@@ -244,7 +244,7 @@ where
         pool_id: B256,
         block_id: Option<BlockId>,
     ) -> Result<(U256, U256), Error> {
-        let block_id = block_id.unwrap_or(BlockId::Number(BlockNumberOrTag::Latest));
+        let block_id = block_id.unwrap_or(BlockId::latest());
         let state_slot = get_pool_state_slot(pool_id);
         let slot_fee_growth_global0 = B256::from(state_slot + FEE_GROWTH_GLOBAL0_OFFSET);
         let data = self
@@ -276,7 +276,7 @@ where
         pool_id: B256,
         block_id: Option<BlockId>,
     ) -> Result<u128, Error> {
-        let block_id = block_id.unwrap_or(BlockId::Number(BlockNumberOrTag::Latest));
+        let block_id = block_id.unwrap_or(BlockId::latest());
         let slot = B256::from(get_pool_state_slot(pool_id) + LIQUIDITY_OFFSET);
         let value = self.manager.extsload_0(slot).block(block_id).call().await?;
         Ok(decode_liquidity(value))
@@ -296,7 +296,7 @@ where
         tick: I,
         block_id: Option<BlockId>,
     ) -> Result<U256, Error> {
-        let block_id = block_id.unwrap_or(BlockId::Number(BlockNumberOrTag::Latest));
+        let block_id = block_id.unwrap_or(BlockId::latest());
         let slot = get_tick_bitmap_slot(pool_id, tick);
         let word = self
             .manager
@@ -307,12 +307,12 @@ where
         Ok(U256::from_be_bytes(word.0))
     }
 
-    /// Retrieves the position information of a pool at a specific position ID
+    /// Retrieves the position information of a pool at a specific position key
     ///
     /// ## Arguments
     ///
     /// * `pool_id`: The ID of the pool
-    /// * `position_id`: The ID of the position
+    /// * `position_key`: The key of the position
     /// * `block_id`: Optional block ID to query at
     ///
     /// ## Returns
@@ -324,11 +324,11 @@ where
     pub async fn get_position_info(
         &self,
         pool_id: B256,
-        position_id: B256,
+        position_key: B256,
         block_id: Option<BlockId>,
     ) -> Result<(u128, U256, U256), Error> {
-        let block_id = block_id.unwrap_or(BlockId::Number(BlockNumberOrTag::Latest));
-        let slot = get_position_info_slot(pool_id, position_id);
+        let block_id = block_id.unwrap_or(BlockId::latest());
+        let slot = get_position_info_slot(pool_id, position_key);
         let data = self
             .manager
             .extsload_1(B256::from(slot), uint!(3_U256))
@@ -352,7 +352,7 @@ where
     /// ## Arguments
     ///
     /// * `pool_id`: The ID of the pool
-    /// * `position_id`: The ID of the position
+    /// * `position_key`: The key of the position
     /// * `block_id`: Optional block ID to query at
     ///
     /// ## Returns
@@ -362,11 +362,11 @@ where
     pub async fn get_position_liquidity(
         &self,
         pool_id: B256,
-        position_id: B256,
+        position_key: B256,
         block_id: Option<BlockId>,
     ) -> Result<u128, Error> {
-        let block_id = block_id.unwrap_or(BlockId::Number(BlockNumberOrTag::Latest));
-        let slot = get_position_info_slot(pool_id, position_id);
+        let block_id = block_id.unwrap_or(BlockId::latest());
+        let slot = get_position_info_slot(pool_id, position_key);
         let value = self
             .manager
             .extsload_0(B256::from(slot))
@@ -462,9 +462,8 @@ const fn decode_liquidity(word: B256) -> u128 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{prelude::calculate_position_key, tests::*};
-    use alloy::{providers::RootProvider, rpc::types::Filter};
-    use alloy_sol_types::{sol, SolEvent};
+    use crate::{prelude::*, tests::*};
+    use alloy::providers::RootProvider;
     use once_cell::sync::Lazy;
     use uniswap_sdk_core::addresses::CHAIN_TO_ADDRESSES_MAP;
 
@@ -738,54 +737,34 @@ mod tests {
         assert_tick_bitmap_match!(*POOL_ID_ETH_USDC, word, BLOCK_ID);
     }
 
-    async fn get_position_ids() -> Vec<B256> {
-        sol! {
-            type PoolId is bytes32;
-
-            event ModifyLiquidity(
-                PoolId indexed id, address indexed sender, int24 tickLower, int24 tickUpper, int256 liquidityDelta, bytes32 salt
-            );
-        }
-
-        // create a filter to get `ModifyLiquidity` events for a specific pool ID
-        let filter = Filter::new()
-            .from_block(BLOCK_ID.unwrap().as_u64().unwrap() - 499)
-            .to_block(BLOCK_ID.unwrap().as_u64().unwrap())
-            .event_signature(ModifyLiquidity::SIGNATURE_HASH)
-            .address(*POOL_MANAGER.manager.address())
-            .topic1(*POOL_ID_ETH_USDC);
-        let logs = PROVIDER.get_logs(&filter).await.unwrap();
-        logs.iter()
-            .map(|log| ModifyLiquidity::decode_log_data(log.data()).unwrap())
-            .filter(|event| event.liquidityDelta.is_positive())
-            .map(
-                |ModifyLiquidity {
-                     sender,
-                     tickLower,
-                     tickUpper,
-                     salt,
-                     ..
-                 }| calculate_position_key(sender, tickLower, tickUpper, salt),
-            )
-            .collect()
+    async fn get_position_keys() -> Vec<B256> {
+        get_position_keys_in_blocks(
+            *POOL_MANAGER.manager.address(),
+            *POOL_ID_ETH_USDC,
+            (BLOCK_ID.unwrap().as_u64().unwrap() - 499).into(),
+            BLOCK_ID.unwrap().as_u64().unwrap().into(),
+            &*PROVIDER,
+        )
+        .await
+        .unwrap()
     }
 
     #[tokio::test]
     async fn test_get_position_info() {
-        let position_ids = get_position_ids().await;
-        assert!(!position_ids.is_empty());
+        let position_keys = get_position_keys().await;
+        assert!(!position_keys.is_empty());
 
-        for position_id in position_ids {
+        for position_key in position_keys {
             let (
                 liquidity_lens,
                 fee_growth_inside0_last_x128_lens,
                 fee_growth_inside1_last_x128_lens,
             ) = POOL_MANAGER
-                .get_position_info(*POOL_ID_ETH_USDC, position_id, BLOCK_ID)
+                .get_position_info(*POOL_ID_ETH_USDC, position_key, BLOCK_ID)
                 .await
                 .unwrap();
             let position_info = STATE_VIEW
-                .getPositionInfo_1(*POOL_ID_ETH_USDC, position_id)
+                .getPositionInfo_1(*POOL_ID_ETH_USDC, position_key)
                 .block(BLOCK_ID.unwrap())
                 .call()
                 .await
@@ -805,16 +784,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_position_liquidity() {
-        let position_ids = get_position_ids().await;
-        assert!(!position_ids.is_empty());
+        let position_keys = get_position_keys().await;
+        assert!(!position_keys.is_empty());
 
-        for position_id in position_ids {
+        for position_key in position_keys {
             let liquidity_lens = POOL_MANAGER
-                .get_position_liquidity(*POOL_ID_ETH_USDC, position_id, BLOCK_ID)
+                .get_position_liquidity(*POOL_ID_ETH_USDC, position_key, BLOCK_ID)
                 .await
                 .unwrap();
             let liquidity = STATE_VIEW
-                .getPositionLiquidity(*POOL_ID_ETH_USDC, position_id)
+                .getPositionLiquidity(*POOL_ID_ETH_USDC, position_key)
                 .block(BLOCK_ID.unwrap())
                 .call()
                 .await
