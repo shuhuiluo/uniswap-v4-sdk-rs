@@ -218,6 +218,12 @@ alloy::sol! {
 alloy::sol! {
     type PoolId is bytes32;
 
+    event ModifyLiquidity(
+        PoolId indexed id, address indexed sender, int24 tickLower, int24 tickUpper, int256 liquidityDelta, bytes32 salt
+    );
+
+    event Transfer(address indexed from, address indexed to, uint256 indexed tokenId);
+
     #[sol(rpc)]
     #[derive(Debug)]
     interface IStateView {
