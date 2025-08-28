@@ -151,6 +151,12 @@ pub fn get_first_token_id_from_transaction(
     position_manager: Address,
     tx_receipt: &TransactionReceipt,
 ) -> Option<U256> {
-    let token_ids = get_token_ids_from_transaction(position_manager, tx_receipt);
-    token_ids.first().map(|(_, token_id)| *token_id)
+    tx_receipt
+        .logs()
+        .iter()
+        .filter(|&log| log.address() == position_manager)
+        .filter(|&log| matches!(log.topic0(), Some(t) if t == &Transfer::SIGNATURE_HASH))
+        .find_map(|log| Transfer::decode_log_data(log.data()).ok())
+        .filter(|event| event.from.is_zero()) // Minting: from == address(0)
+        .map(|event| event.tokenId)
 }
