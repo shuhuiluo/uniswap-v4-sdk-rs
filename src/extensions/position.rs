@@ -39,11 +39,7 @@ pub fn get_position_keys_from_transaction(
         .logs()
         .iter()
         .filter(|&log| log.address() == pool_manager)
-        .filter(|&log| {
-            log.topic0()
-                .map(|topic| topic == &ModifyLiquidity::SIGNATURE_HASH)
-                .unwrap_or(false)
-        })
+        .filter(|&log| matches!(log.topic0(), Some(t) if t == &ModifyLiquidity::SIGNATURE_HASH))
         .filter_map(|log| ModifyLiquidity::decode_log_data(log.data()).ok())
         .filter(|event| event.liquidityDelta.is_positive())
         .map(|event| {
@@ -129,11 +125,7 @@ pub fn get_token_ids_from_transaction(
         .logs()
         .iter()
         .filter(|&log| log.address() == position_manager)
-        .filter(|&log| {
-            log.topic0()
-                .map(|topic| topic == &Transfer::SIGNATURE_HASH)
-                .unwrap_or(false)
-        })
+        .filter(|&log| matches!(log.topic0(), Some(t) if t == &Transfer::SIGNATURE_HASH))
         .filter_map(|log| Transfer::decode_log_data(log.data()).ok())
         .filter(|event| event.from.is_zero()) // Minting: from == address(0)
         .map(|event| (event.to, event.tokenId))
