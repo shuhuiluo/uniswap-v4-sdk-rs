@@ -29,6 +29,11 @@ cargo build --features extensions
 - **[mint_position_basic.rs](./mint_position_basic.rs)** - Demonstrates minting a liquidity position in an existing
   ETH-USDC V4 pool
 
+### Liquidity Management Examples
+
+- **[increase_liquidity.rs](./increase_liquidity.rs)** - Shows how to add more tokens to an existing position,
+  demonstrating the complete workflow from initial mint to liquidity increase
+
 ### Advanced Examples
 
 - **[mint_position_permit2.rs](./mint_position_permit2.rs)** - Demonstrates using Permit2 for gasless token approvals
@@ -41,6 +46,9 @@ Each example can be run independently:
 ```bash
 # Run the basic minting example
 cargo run --example mint_position_basic --features extensions
+
+# Run the liquidity increase example
+cargo run --example increase_liquidity --features extensions
 
 # Run the permit2 example
 cargo run --example mint_position_permit2 --features extensions
