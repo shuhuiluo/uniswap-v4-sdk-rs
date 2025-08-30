@@ -2,11 +2,17 @@
 
 use super::{constants::PERMIT2_ADDRESS, tokens::ETHER};
 use alloy::{
+    network::TransactionBuilder,
     providers::{ext::AnvilApi, Provider},
+    rpc::types::TransactionRequest,
     signers::{local::PrivateKeySigner, SignerSync},
     sol_types::{eip712_domain, Eip712Domain, SolStruct},
 };
-use alloy_primitives::{aliases::U24, Address, Bytes, Signature, B256, U256};
+use alloy_primitives::{
+    aliases::{U24, U48},
+    Address, Bytes, Signature, B256, U160, U256,
+};
+use alloy_sol_types::SolCall;
 use uniswap_sdk_core::prelude::*;
 use uniswap_v3_sdk::prelude::*;
 use uniswap_v4_sdk::{
@@ -60,10 +66,39 @@ pub async fn setup_token_balance(
             provider
                 .anvil_set_storage_at(token, U256::from_be_bytes(slot.0), value)
                 .await
-                .unwrap();
+                .map_err(|e| Error::ContractError(e.into()))?;
         }
     }
 
+    Ok(())
+}
+
+/// Helper function to set up token balance and Permit2 approval for a specific token
+#[inline]
+pub async fn setup_token_and_approval(
+    provider: &impl Provider,
+    account: Address,
+    v4_position_manager: Address,
+    token_address: Address,
+    amount: U256,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // Set up token balance
+    setup_token_balance(provider, token_address, account, amount, PERMIT2_ADDRESS).await?;
+
+    // Approve v4_position_manager on Permit2 for token transfers
+    let approve_call = IAllowanceTransfer::approveCall {
+        token: token_address,
+        spender: v4_position_manager,
+        amount: U160::from(amount),
+        expiration: U48::MAX,
+    };
+
+    let approve_tx = TransactionRequest::default()
+        .with_from(account)
+        .with_to(PERMIT2_ADDRESS)
+        .with_input(approve_call.abi_encode());
+
+    provider.send_transaction(approve_tx).await?.watch().await?;
     Ok(())
 }
 

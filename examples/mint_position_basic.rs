@@ -4,8 +4,6 @@ use alloy::{
     providers::{ext::AnvilApi, Provider},
     rpc::types::TransactionRequest,
 };
-use alloy_primitives::{aliases::U48, U160};
-use alloy_sol_types::SolCall;
 use uniswap_sdk_core::prelude::*;
 use uniswap_v3_sdk::prelude::{nearest_usable_tick, FeeAmount, MintAmounts};
 use uniswap_v4_sdk::{extensions::get_first_token_id_from_transaction, prelude::*};
@@ -46,32 +44,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let tick_upper = nearest_usable_tick(pool.tick_current + TICK_SPACING * 10, TICK_SPACING);
 
     let mut position = Position::new(pool, LIQUIDITY_AMOUNT, tick_lower, tick_upper);
-    let MintAmounts { amount0, amount1 } = position.mint_amounts()?;
+    let MintAmounts { amount1, .. } = position.mint_amounts()?;
 
-    // Set up token balances and Permit2 approvals
-    setup_token_balance(&provider, USDC.address(), account, amount1, PERMIT2_ADDRESS).await?;
-    setup_token_balance(
+    // Set up USDC balance and Permit2 approval
+    setup_token_and_approval(
         &provider,
-        ETHER.address(),
         account,
-        amount0,
-        PERMIT2_ADDRESS,
+        v4_position_manager,
+        USDC.address(),
+        amount1,
     )
     .await?;
-
-    let approve_call = IAllowanceTransfer::approveCall {
-        token: USDC.address(),
-        spender: v4_position_manager,
-        amount: U160::from(amount1),
-        expiration: U48::MAX,
-    };
-
-    let approve_tx = TransactionRequest::default()
-        .with_from(account)
-        .with_to(PERMIT2_ADDRESS)
-        .with_input(approve_call.abi_encode());
-
-    provider.send_transaction(approve_tx).await?.watch().await?;
 
     let options = create_add_liquidity_options(account, None);
     let params = add_call_parameters(&mut position, options)?;
