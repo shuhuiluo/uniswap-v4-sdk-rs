@@ -37,8 +37,8 @@ pub use uniswap_v3_sdk::multicall;
 #[cfg(feature = "extensions")]
 pub mod extensions;
 
-#[cfg(any(test, feature = "test-utils"))]
-pub mod tests;
+#[cfg(test)]
+mod tests;
 
 pub mod prelude {
     pub use crate::{abi::*, entities::*, error::*, multicall::*, position_manager::*, utils::*};

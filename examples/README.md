@@ -34,26 +34,19 @@ cargo build --features extensions
 - **[mint_position_permit2.rs](./mint_position_permit2.rs)** - Demonstrates using Permit2 for gasless token approvals
   when minting positions
 
-- **[mint_position_create_pool.rs](./mint_position_create_pool.rs)** - Shows how to create a new V4 pool and mint a
-  position in the same transaction
-
 ## Running Examples
 
 Each example can be run independently:
 
 ```bash
 # Run the basic minting example
-cargo run --example mint_position_basic --features extensions,test-utils
-
-# Run the create pool + mint example  
-cargo run --example mint_position_create_pool --features extensions,test-utils
+cargo run --example mint_position_basic --features extensions
 
 # Run the permit2 example
-cargo run --example mint_position_permit2 --features extensions,test-utils
+cargo run --example mint_position_permit2 --features extensions
 ```
 
-**Note**: Examples require both `extensions` (for V4 functionality) and `test-utils` (for test tokens and helper
-functions) features.
+**Note**: Examples require the `extensions` feature for V4 functionality.
 
 ## Key Concepts
 
@@ -83,13 +76,7 @@ All examples use Anvil forking to create a local testnet that mirrors the mainne
 ## Common Patterns
 
 - Use `uniswap_v4_sdk::prelude::*` for easy imports
-- Import test utilities with `use uniswap_v4_sdk::tests::*` (requires `test-utils` feature)
+- Use shared utilities from `examples/common` module
 - Set up Anvil provider for local testing
 - Handle both native ETH and ERC20 tokens as currencies
 - Use appropriate slippage tolerance and deadline parameters
-
-## Features
-
-- **`extensions`**: Core V4 functionality including `PoolManagerLens` and RPC capabilities
-- **`test-utils`**: Test tokens, helper functions, and utilities for examples and testing (includes `once_cell`,
-  `dotenv`, `std`)
