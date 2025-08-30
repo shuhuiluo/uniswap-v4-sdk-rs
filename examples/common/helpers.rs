@@ -147,3 +147,23 @@ pub fn create_add_liquidity_options(
         }),
     }
 }
+
+/// Create AddLiquidityOptions for increasing liquidity in existing positions
+#[inline]
+pub fn create_increase_liquidity_options(
+    token_id: U256,
+    batch_permit: Option<BatchPermitOptions>,
+) -> AddLiquidityOptions {
+    AddLiquidityOptions {
+        common_opts: CommonOptions {
+            slippage_tolerance: Percent::new(1, 1000),
+            deadline: U256::MAX,
+            hook_data: Default::default(),
+        },
+        use_native: Some(ETHER.clone()),
+        batch_permit,
+        specific_opts: AddLiquiditySpecificOptions::Increase(ModifyPositionSpecificOptions {
+            token_id,
+        }),
+    }
+}

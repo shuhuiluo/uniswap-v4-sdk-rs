@@ -53,3 +53,7 @@ required-features = ["extensions"]
 [[example]]
 name = "mint_position_permit2"
 required-features = ["extensions"]
+
+[[example]]
+name = "increase_liquidity"
+required-features = ["extensions"]
