@@ -741,8 +741,8 @@ mod tests {
         get_position_keys_in_blocks(
             *POOL_MANAGER.manager.address(),
             *POOL_ID_ETH_USDC,
-            (BLOCK_ID.unwrap().as_u64().unwrap() - 499).into(),
-            BLOCK_ID.unwrap().as_u64().unwrap().into(),
+            BLOCK_ID.unwrap().as_u64().unwrap() - 499,
+            BLOCK_ID.unwrap().as_u64().unwrap(),
             &*PROVIDER,
         )
         .await
