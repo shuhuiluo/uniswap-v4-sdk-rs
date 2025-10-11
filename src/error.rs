@@ -38,6 +38,11 @@ pub enum Error {
     #[error("Insufficient liquidity")]
     InsufficientLiquidity,
 
+    /// Thrown when a pool has been created but not yet initialized
+    #[cfg(feature = "extensions")]
+    #[error("Pool has been created but not yet initialized")]
+    PoolNotInitialized,
+
     #[cfg(feature = "extensions")]
     #[error("{0}")]
     ContractError(#[from] alloy::contract::Error),

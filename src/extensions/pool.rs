@@ -87,10 +87,9 @@ impl Pool {
         let (sqrt_price_x96, _, _, _) = slot0?;
         let liquidity = liquidity?;
 
-        assert!(
-            !sqrt_price_x96.is_zero(),
-            "Pool has been created but not yet initialized"
-        );
+        if sqrt_price_x96.is_zero() {
+            return Err(Error::PoolNotInitialized);
+        }
 
         Self::new(
             create_currency(chain_id, currency_a, token_a_data?),
