@@ -465,19 +465,10 @@ mod tests {
     use crate::{prelude::*, tests::*};
     use alloy::providers::RootProvider;
     use once_cell::sync::Lazy;
-    use uniswap_sdk_core::addresses::CHAIN_TO_ADDRESSES_MAP;
 
     const TICK_SPACING: i32 = 10;
-    static POOL_MANAGER: Lazy<PoolManagerLens<RootProvider>> = Lazy::new(|| {
-        PoolManagerLens::new(
-            CHAIN_TO_ADDRESSES_MAP
-                .get(&1)
-                .unwrap()
-                .v4_pool_manager
-                .unwrap(),
-            PROVIDER.clone(),
-        )
-    });
+    static POOL_MANAGER: Lazy<PoolManagerLens<RootProvider>> =
+        Lazy::new(|| PoolManagerLens::new(*POOL_MANAGER_ADDRESS, PROVIDER.clone()));
 
     #[tokio::test]
     async fn test_get_slot0() {

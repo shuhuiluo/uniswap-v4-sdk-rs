@@ -185,16 +185,7 @@ where
         let pool_ids = swaps
             .iter()
             .flat_map(|swap| swap.route.pools.iter())
-            .map(|pool| {
-                Pool::get_pool_id(
-                    &pool.currency0,
-                    &pool.currency1,
-                    pool.fee,
-                    pool.tick_spacing,
-                    pool.hooks,
-                )
-                .unwrap()
-            });
+            .map(|pool| pool.pool_id);
         let pool_id_set: HashSet<B256> = HashSet::from_iter(pool_ids);
         assert_eq!(num_pools, pool_id_set.len(), "POOLS_DUPLICATED");
         Ok(Self {

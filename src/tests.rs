@@ -175,6 +175,14 @@ mod extensions {
         .unwrap()
     });
 
+    pub(crate) static POOL_MANAGER_ADDRESS: Lazy<Address> = Lazy::new(|| {
+        CHAIN_TO_ADDRESSES_MAP
+            .get(&1)
+            .unwrap()
+            .v4_pool_manager
+            .unwrap()
+    });
+
     pub(crate) static STATE_VIEW: Lazy<IStateView::IStateViewInstance<RootProvider>> =
         Lazy::new(|| {
             IStateView::new(
