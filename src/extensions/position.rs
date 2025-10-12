@@ -1,20 +1,100 @@
-//! Position utilities for parsing identifiers from V4 transactions and events.
+//! ## Position Extension
+//! Functions to query and work with Uniswap V4 positions from the position manager NFT.
 //!
-//! This module provides functionality to extract both position keys and NFT token IDs from Uniswap
-//! V4 transactions. Position keys are derived from ModifyLiquidity events and used for pool manager
-//! queries, while NFT token IDs come from ERC721 Transfer events and are used for position manager
-//! operations.
+//! ## Features
+//!
+//! - **Position fetching**: Query full position data from NFT token IDs
+//! - **Event parsing**: Extract position keys and token IDs from transaction events
+//!
+//! ## Architecture
+//!
+//! V4 positions have a two-tier architecture:
+//! - **Position Manager**: ERC721 NFT contract managing positions via token IDs
+//! - **Pool Manager**: Core contract storing actual position state (liquidity, fees)
+//!
+//! Position keys link these systems: derived from ModifyLiquidity events for pool manager queries,
+//! while token IDs from Transfer events identify position manager NFTs.
 
-use crate::prelude::{calculate_position_key, Error, ModifyLiquidity, Transfer};
+use crate::{
+    entities::{pool::Pool, position::Position},
+    prelude::*,
+};
 use alloc::vec::Vec;
 use alloy::{
-    eips::BlockNumberOrTag,
+    eips::{BlockId, BlockNumberOrTag},
     network::Network,
     providers::Provider,
     rpc::types::{Filter, TransactionReceipt},
 };
-use alloy_primitives::{Address, B256, U256};
+use alloy_primitives::{aliases::I24, Address, ChainId, B256, I256, U256};
 use alloy_sol_types::SolEvent;
+
+/// Fetches position data from the position manager NFT and creates a Position.
+///
+/// ## Arguments
+///
+/// * `chain_id` - The chain id
+/// * `position_manager` - The address of the V4 position manager contract
+/// * `token_id` - The NFT token ID of the position
+/// * `provider` - The provider instance for blockchain queries
+/// * `block_id` - Optional block number to query
+///
+/// ## Returns
+///
+/// A [`Position`] struct with pool data and position parameters
+#[inline]
+pub async fn get_position<N, P>(
+    chain_id: ChainId,
+    position_manager: Address,
+    token_id: U256,
+    provider: P,
+    block_id: Option<BlockId>,
+) -> Result<Position, Error>
+where
+    N: Network,
+    P: Provider<N>,
+{
+    let block_id = block_id.unwrap_or(BlockId::latest());
+    let pm_contract = IPositionManagerView::new(position_manager, &provider);
+
+    // Fetch pool manager address, pool key, position info, and liquidity
+    let pool_manager_call = pm_contract.poolManager().block(block_id);
+    let pool_and_info_call = pm_contract.getPoolAndPositionInfo(token_id).block(block_id);
+    let liquidity_call = pm_contract.getPositionLiquidity(token_id).block(block_id);
+
+    let (pool_manager, pool_and_info, liquidity) = tokio::join!(
+        pool_manager_call.call(),
+        pool_and_info_call.call(),
+        liquidity_call.call()
+    );
+
+    let pool_and_info_result = pool_and_info?;
+    let pool_key = pool_and_info_result._0;
+
+    // Decode tick_lower and tick_upper from packed position info
+    let (tick_lower, tick_upper) = decode_position_info(pool_and_info_result._1);
+
+    // Fetch pool data from pool manager
+    let pool = Pool::from_pool_key(
+        chain_id,
+        pool_manager?,
+        pool_key.currency0,
+        pool_key.currency1,
+        pool_key.fee,
+        pool_key.tickSpacing,
+        pool_key.hooks,
+        provider,
+        Some(block_id),
+    )
+    .await?;
+
+    Ok(Position::new(
+        pool,
+        liquidity?,
+        tick_lower.as_i32(),
+        tick_upper.as_i32(),
+    ))
+}
 
 /// Extracts position keys from ModifyLiquidity events in a specific transaction.
 ///
@@ -160,6 +240,28 @@ pub fn get_first_token_id_from_transaction(
         .map(|event| event.tokenId)
 }
 
+/// Decodes tick_lower and tick_upper from a packed PositionInfo uint256.
+///
+/// ## PositionInfo Layout (from least significant bit)
+///
+/// - Bits 0-7: hasSubscriber (8 bits)
+/// - Bits 8-31: tickLower (24 bits, signed)
+/// - Bits 32-55: tickUpper (24 bits, signed)
+/// - Bits 56-255: poolId (200 bits, truncated)
+///
+/// ## Arguments
+///
+/// * `position_info` - The packed PositionInfo as a U256
+///
+/// ## Returns
+///
+/// A tuple of (tick_lower, tick_upper) as signed 24-bit integers
+fn decode_position_info(position_info: U256) -> (I24, I24) {
+    let tick_lower = I256::from_raw(position_info << 224).asr(232);
+    let tick_upper = I256::from_raw(position_info << 200).asr(232);
+    (I24::from(tick_lower), I24::from(tick_upper))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -167,6 +269,7 @@ mod tests {
     use alloy::rpc::types::Filter;
     use once_cell::sync::Lazy;
     use uniswap_sdk_core::addresses::CHAIN_TO_ADDRESSES_MAP;
+    use uniswap_v3_sdk::entities::TickIndex;
 
     static V4_POOL_MANAGER: Lazy<Address> = Lazy::new(|| {
         CHAIN_TO_ADDRESSES_MAP
@@ -186,6 +289,26 @@ mod tests {
 
     const FROM_BLOCK: u64 = BLOCK_ID.unwrap().as_u64().unwrap() - 499;
     const TO_BLOCK: u64 = BLOCK_ID.unwrap().as_u64().unwrap();
+
+    /// Helper function to find and fetch a transaction receipt containing NFT minting events
+    async fn get_mint_receipt(position_manager: Address) -> TransactionReceipt {
+        let filter = Filter::new()
+            .from_block(FROM_BLOCK)
+            .to_block(TO_BLOCK)
+            .event_signature(Transfer::SIGNATURE_HASH)
+            .address(position_manager)
+            .topic1(B256::ZERO); // from address(0) - minting events
+
+        let logs = PROVIDER.get_logs(&filter).await.unwrap();
+        assert!(!logs.is_empty(), "Should find Transfer events");
+
+        let tx_hash = logs.first().unwrap().transaction_hash.unwrap();
+        PROVIDER
+            .get_transaction_receipt(tx_hash)
+            .await
+            .unwrap()
+            .unwrap()
+    }
 
     #[tokio::test]
     async fn test_get_position_keys_in_blocks() {
@@ -248,24 +371,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_token_ids_from_transaction() {
         let position_manager = *V4_POSITION_MANAGER;
-
-        // Query for Transfer events (minting) in our test block range
-        let filter = Filter::new()
-            .from_block(FROM_BLOCK)
-            .to_block(TO_BLOCK)
-            .event_signature(Transfer::SIGNATURE_HASH)
-            .address(position_manager)
-            .topic1(B256::ZERO); // from address(0) - minting events
-
-        let logs = PROVIDER.get_logs(&filter).await.unwrap();
-
-        // Get a transaction that contains NFT minting
-        let tx_hash = logs.first().unwrap().transaction_hash.unwrap();
-        let receipt = PROVIDER
-            .get_transaction_receipt(tx_hash)
-            .await
-            .unwrap()
-            .unwrap();
+        let receipt = get_mint_receipt(position_manager).await;
 
         let token_ids = get_token_ids_from_transaction(position_manager, &receipt);
 
@@ -287,24 +393,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_first_token_id_from_transaction() {
         let position_manager = *V4_POSITION_MANAGER;
-
-        // Query for Transfer events (minting) in our test block range
-        let filter = Filter::new()
-            .from_block(FROM_BLOCK)
-            .to_block(TO_BLOCK)
-            .event_signature(Transfer::SIGNATURE_HASH)
-            .address(position_manager)
-            .topic1(B256::ZERO); // from address(0) - minting events
-
-        let logs = PROVIDER.get_logs(&filter).await.unwrap();
-
-        // Get a transaction that contains NFT minting
-        let tx_hash = logs.first().unwrap().transaction_hash.unwrap();
-        let receipt = PROVIDER
-            .get_transaction_receipt(tx_hash)
-            .await
-            .unwrap()
-            .unwrap();
+        let receipt = get_mint_receipt(position_manager).await;
 
         let first_token_id = get_first_token_id_from_transaction(position_manager, &receipt);
 
@@ -321,6 +410,57 @@ mod tests {
             first_token_id.unwrap(),
             all_token_ids.first().unwrap().1,
             "First token ID should match"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_position() {
+        let position_manager = *V4_POSITION_MANAGER;
+        let receipt = get_mint_receipt(position_manager).await;
+
+        let token_id = get_first_token_id_from_transaction(position_manager, &receipt)
+            .expect("Should find a token ID");
+
+        // Fetch the position
+        let position = get_position(1, position_manager, token_id, PROVIDER.clone(), BLOCK_ID)
+            .await
+            .unwrap();
+
+        // Verify the position is valid
+        assert!(
+            position.liquidity > 0,
+            "Position should have non-zero liquidity"
+        );
+        assert!(
+            position.tick_lower < position.tick_upper,
+            "tick_lower should be less than tick_upper"
+        );
+        assert!(
+            !position.pool.sqrt_price_x96.is_zero(),
+            "Pool should have valid price"
+        );
+
+        // Validate against pool manager direct query
+        // Calculate position key: Position.calculatePositionKey(address(this), tickLower,
+        // tickUpper, bytes32(tokenId))
+        let position_key = calculate_position_key(
+            position_manager,
+            position.tick_lower.to_i24(),
+            position.tick_upper.to_i24(),
+            B256::from(token_id),
+        );
+
+        // Query pool manager directly using PoolManagerLens
+        let lens = PoolManagerLens::new(*V4_POOL_MANAGER, PROVIDER.clone());
+        let liquidity_from_lens = lens
+            .get_position_liquidity(position.pool.pool_id, position_key, BLOCK_ID)
+            .await
+            .unwrap();
+
+        // Verify liquidity matches between position manager view and direct pool manager query
+        assert_eq!(
+            position.liquidity, liquidity_from_lens,
+            "Liquidity should match between position manager view and pool manager direct query"
         );
     }
 }

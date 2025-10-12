@@ -202,6 +202,18 @@ sol! {
             external
             payable;
     }
+
+    #[cfg(feature = "extensions")]
+    #[sol(rpc)]
+    interface IPositionManagerView {
+        type PositionInfo is uint256;
+
+        function poolManager() external view returns (address);
+
+        function getPositionLiquidity(uint256 tokenId) external view returns (uint128 liquidity);
+
+        function getPoolAndPositionInfo(uint256 tokenId) external view returns (PoolKey memory, PositionInfo);
+    }
 }
 
 #[cfg(feature = "extensions")]
