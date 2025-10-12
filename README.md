@@ -17,10 +17,11 @@ It is feature-complete with matching unit tests.
   and [SDK Core](https://github.com/malik672/uniswap-sdk-core-rust)
 - An [`extensions`](./src/extensions) feature for additional functionalities related to Uniswap V4, including:
 
-    - [`pool_manager_lens`](./src/extensions/pool_manager_lens.rs) module for querying the Uniswap V4 pool manager.
-      Similar to [`StateView`](https://github.com/Uniswap/v4-periphery/blob/main/src/lens/StateView.sol).
-    - [`simple_tick_data_provider`](./src/extensions/simple_tick_data_provider.rs) module for fetching tick data from
-      the Uniswap V4 pool manager contract directly via RPC calls
+    - [`pool`](./src/extensions/pool.rs): Create Pool structs from on-chain data
+    - [`position`](./src/extensions/position.rs): Fetch position data from NFT token IDs and parse events
+    - [`pool_manager_lens`](./src/extensions/pool_manager_lens.rs): Query pool manager state (similar
+      to [`StateView`](https://github.com/Uniswap/v4-periphery/blob/main/src/lens/StateView.sol))
+    - [`simple_tick_data_provider`](./src/extensions/simple_tick_data_provider.rs): Fetch tick data via RPC
 
 ## Supported Rust Versions (MSRV)
 
