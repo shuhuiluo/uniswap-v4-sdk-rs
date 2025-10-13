@@ -79,7 +79,7 @@ cargo fmt --all -- --check
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+This project is licensed under the [MIT License](https://github.com/shuhuiluo/uniswap-v4-sdk-rs/blob/main/LICENSE).
 
 ## Acknowledgements
 
