@@ -61,7 +61,7 @@ pub struct AddLiquidityOptions {
     pub use_native: Option<Ether>,
     /// The optional permit2 batch permit parameters for spending token0 and token1.
     pub batch_permit: Option<BatchPermitOptions>,
-    /// [`MintSpecificOptions`] or [`IncreaseSpecificOptions`]
+    /// [`MintSpecificOptions`] or [`ModifyPositionSpecificOptions`]
     pub specific_opts: AddLiquiditySpecificOptions,
 }
 

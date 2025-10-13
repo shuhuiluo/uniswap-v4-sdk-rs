@@ -399,7 +399,7 @@ impl<TP: TickDataProvider> Position<TP> {
     ///
     /// * `slippage_tolerance`: The amount by which the price can 'slip' before the transaction will
     ///   revert
-    /// * `spender`: The spender of the permit (should usually be the [`PositionManager`])
+    /// * `spender`: The spender of the permit (should usually be the `PositionManager`)
     /// * `nonce`: A valid permit2 nonce
     /// * `deadline`: The deadline for the permit
     #[inline]
