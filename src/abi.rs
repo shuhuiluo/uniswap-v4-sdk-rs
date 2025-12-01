@@ -70,6 +70,7 @@ sol! {
     struct SwapExactInParams {
         address currencyIn;
         PathKey[] path;
+        uint256[] maxHopSlippage;
         uint128 amountIn;
         uint128 amountOutMinimum;
     }
@@ -87,6 +88,7 @@ sol! {
     struct SwapExactOutParams {
         address currencyOut;
         PathKey[] path;
+        uint256[] maxHopSlippage;
         uint128 amountOut;
         uint128 amountInMaximum;
     }
