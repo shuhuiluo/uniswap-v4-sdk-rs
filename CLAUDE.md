@@ -97,7 +97,7 @@ leveraging Rust's performance and safety features.
 
 ### Important Notes
 
-- MSRV (Minimum Supported Rust Version) is 1.86
+- MSRV (Minimum Supported Rust Version) is 1.88
 - When adding new features, maintain compatibility with the TypeScript SDK API
 - Use snake_case naming convention (not camelCase like TypeScript)
 - Import via prelude for convenience: `use uniswap_v4_sdk::prelude::*`

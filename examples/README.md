@@ -5,7 +5,7 @@ V4 protocols.
 
 ## Prerequisites
 
-- Rust 1.86 or later
+- Rust 1.88 or later
 - A mainnet RPC URL (for forking)
 
 ## Setup
