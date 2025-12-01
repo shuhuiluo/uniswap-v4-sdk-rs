@@ -6,6 +6,8 @@ on:
       - main
   pull_request:
   workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * *'  # Run at 12:00 AM UTC daily
 
 env:
   CARGO_TERM_COLOR: always
