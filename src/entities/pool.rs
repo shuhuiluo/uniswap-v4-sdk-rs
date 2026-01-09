@@ -677,7 +677,10 @@ mod tests {
                 FeeAmount::LOWEST.into(),
                 10,
                 Address::ZERO,
-                encode_sqrt_ratio_x96(BigInt::from(101e6 as u128), BigInt::from(100e18 as u128)),
+                encode_sqrt_ratio_x96(
+                    BigInt::from_u128(101e6 as u128).unwrap(),
+                    BigInt::from_u128(100e18 as u128).unwrap()
+                ),
                 0,
             )
             .unwrap()
@@ -693,7 +696,10 @@ mod tests {
                 FeeAmount::LOWEST.into(),
                 10,
                 Address::ZERO,
-                encode_sqrt_ratio_x96(BigInt::from(101e6 as u128), BigInt::from(100e18 as u128)),
+                encode_sqrt_ratio_x96(
+                    BigInt::from_u128(101e6 as u128).unwrap(),
+                    BigInt::from_u128(100e18 as u128).unwrap()
+                ),
                 0,
             )
             .unwrap()
@@ -713,7 +719,10 @@ mod tests {
                 FeeAmount::LOWEST.into(),
                 10,
                 Address::ZERO,
-                encode_sqrt_ratio_x96(BigInt::from(101e6 as u128), BigInt::from(100e18 as u128)),
+                encode_sqrt_ratio_x96(
+                    BigInt::from_u128(101e6 as u128).unwrap(),
+                    BigInt::from_u128(100e18 as u128).unwrap()
+                ),
                 0,
             )
             .unwrap()
@@ -729,7 +738,10 @@ mod tests {
                 FeeAmount::LOWEST.into(),
                 10,
                 Address::ZERO,
-                encode_sqrt_ratio_x96(BigInt::from(101e6 as u128), BigInt::from(100e18 as u128)),
+                encode_sqrt_ratio_x96(
+                    BigInt::from_u128(101e6 as u128).unwrap(),
+                    BigInt::from_u128(100e18 as u128).unwrap()
+                ),
                 0,
             )
             .unwrap()

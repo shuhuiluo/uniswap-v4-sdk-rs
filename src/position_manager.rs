@@ -3,7 +3,6 @@ use alloc::vec::Vec;
 use alloy_primitives::{address, Address, Bytes, Signature, U160, U256};
 use alloy_sol_types::{eip712_domain, SolCall};
 use derive_more::{Deref, DerefMut, From};
-use num_traits::ToPrimitive;
 use uniswap_sdk_core::prelude::*;
 use uniswap_v3_sdk::prelude::{
     IERC721Permit, MethodParameters, MintAmounts, TickDataProvider, TickIndex,
@@ -350,10 +349,11 @@ pub fn remove_call_parameters<TP: TickDataProvider>(
                 position.pool.sqrt_price_x96,
                 position.pool.liquidity,
             )?,
-            (options.liquidity_percentage * Percent::new(position.liquidity, 1))
-                .quotient()
-                .to_u128()
-                .unwrap(),
+            (options.liquidity_percentage
+                * Percent::new(BigInt::from_u128(position.liquidity).unwrap(), 1))
+            .quotient()
+            .to_u128()
+            .unwrap(),
             position.tick_lower.try_into().unwrap(),
             position.tick_upper.try_into().unwrap(),
         );

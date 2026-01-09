@@ -115,7 +115,8 @@ pub(crate) static TICK_LIST: Lazy<Vec<Tick>> = Lazy::new(|| {
 #[macro_export]
 macro_rules! currency_amount {
     ($currency:expr, $amount:expr) => {
-        CurrencyAmount::from_raw_amount($currency.clone(), $amount).unwrap()
+        CurrencyAmount::from_raw_amount($currency.clone(), BigInt::from_u128($amount).unwrap())
+            .unwrap()
     };
 }
 

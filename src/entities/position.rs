@@ -5,7 +5,6 @@ use alloy_primitives::{
     keccak256, uint, U160, U256,
 };
 use alloy_sol_types::SolValue;
-use num_traits::ToPrimitive;
 use uniswap_sdk_core::prelude::*;
 use uniswap_v3_sdk::prelude::*;
 
@@ -543,8 +542,12 @@ mod tests {
     use crate::tests::*;
     use once_cell::sync::Lazy;
 
-    static POOL_SQRT_RATIO_START: Lazy<U160> =
-        Lazy::new(|| encode_sqrt_ratio_x96(100000000_u128, 100000000000000000000_u128));
+    static POOL_SQRT_RATIO_START: Lazy<U160> = Lazy::new(|| {
+        encode_sqrt_ratio_x96(
+            BigInt::from_u128(100000000).unwrap(),
+            BigInt::from_u128(100000000000000000000).unwrap(),
+        )
+    });
     static POOL_TICK_CURRENT: Lazy<i32> = Lazy::new(|| {
         get_tick_at_sqrt_ratio(*POOL_SQRT_RATIO_START)
             .unwrap()
