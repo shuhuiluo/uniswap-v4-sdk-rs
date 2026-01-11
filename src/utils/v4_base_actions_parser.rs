@@ -98,14 +98,12 @@ mod tests {
             Actions::SWAP_EXACT_IN(SwapExactInParams {
                 currencyIn: DAI.address,
                 path: encode_route_to_path(&create_route!(DAI_USDC, USDC_WETH; DAI, WETH), false),
-                maxHopSlippage: vec![],
                 amountIn: AMOUNT.try_into().unwrap(),
                 amountOutMinimum: AMOUNT.try_into().unwrap(),
             }),
             Actions::SWAP_EXACT_OUT(SwapExactOutParams {
                 currencyOut: DAI.address,
                 path: encode_route_to_path(&create_route!(DAI_USDC, USDC_WETH; DAI, WETH), false),
-                maxHopSlippage: vec![],
                 amountOut: AMOUNT.try_into().unwrap(),
                 amountInMaximum: AMOUNT.try_into().unwrap(),
             }),
