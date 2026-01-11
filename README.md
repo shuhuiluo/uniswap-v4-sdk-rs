@@ -39,7 +39,7 @@ The current MSRV (minimum supported Rust version) is 1.88.
 Add the following to your `Cargo.toml` file:
 
 ```toml
-uniswap-v4-sdk = { version = "0.13.0", features = ["extensions", "std"] }
+uniswap-v4-sdk = { version = "1.0.0", features = ["extensions", "std"] }
 ```
 
 ### Usage
