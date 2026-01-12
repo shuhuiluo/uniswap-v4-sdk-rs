@@ -97,7 +97,7 @@ where
     /// Returns the mid price of the route
     #[inline]
     pub fn mid_price(&self) -> Result<Price<TInput, TOutput>, Error> {
-        let mut price = self.pools[0].price_of(&self.input)?;
+        let mut price = self.pools[0].price_of(&self.path_input)?;
         for pool in &self.pools[1..] {
             price = price.multiply(&pool.price_of(&price.quote_currency)?)?;
         }
@@ -282,6 +282,9 @@ mod tests {
     mod mid_price {
         use super::*;
 
+        static CURRENCY3: Lazy<Currency> =
+            Lazy::new(|| token!(1, "D000000000000000000000000000000000000000", 18, "t3").into());
+
         static POOL_0_1: Lazy<Pool> = Lazy::new(|| {
             Pool::new(
                 CURRENCY0.clone(),
@@ -326,6 +329,30 @@ mod tests {
                 10,
                 Address::ZERO,
                 encode_sqrt_ratio_x96(1, 7),
+                0,
+            )
+            .unwrap()
+        });
+        static POOL_3_WETH: Lazy<Pool> = Lazy::new(|| {
+            Pool::new(
+                WETH.clone().into(),
+                CURRENCY3.clone(),
+                FeeAmount::MEDIUM.into(),
+                10,
+                Address::ZERO,
+                encode_sqrt_ratio_x96(1, 5),
+                0,
+            )
+            .unwrap()
+        });
+        static POOL_0_3: Lazy<Pool> = Lazy::new(|| {
+            Pool::new(
+                CURRENCY0.clone(),
+                CURRENCY3.clone(),
+                FeeAmount::MEDIUM.into(),
+                10,
+                Address::ZERO,
+                encode_sqrt_ratio_x96(1, 5),
                 0,
             )
             .unwrap()
@@ -399,6 +426,24 @@ mod tests {
             assert_eq!(price.to_significant(4, None).unwrap(), "4.2");
             assert!(price.base_currency.equals(&ETHER.clone()));
             assert!(price.quote_currency.equals(&ETHER.clone()));
+        }
+
+        #[test]
+        fn correct_for_eth_as_input_and_weth_as_path_input() {
+            let route = create_route!(POOL_3_WETH, ETHER, CURRENCY3);
+            let price = route.mid_price().unwrap();
+            assert_eq!(price.to_significant(4, None).unwrap(), "0.2");
+            assert!(price.base_currency.equals(&ETHER.clone()));
+            assert!(price.quote_currency.equals(&CURRENCY3.clone()));
+        }
+
+        #[test]
+        fn correct_for_eth_as_input_and_weth_as_path_input_with_multiple_pools() {
+            let route = create_route!(POOL_3_WETH, POOL_0_3; ETHER, CURRENCY0);
+            let price = route.mid_price().unwrap();
+            assert_eq!(price.to_significant(4, None).unwrap(), "1");
+            assert!(price.base_currency.equals(&ETHER.clone()));
+            assert!(price.quote_currency.equals(&CURRENCY0.clone()));
         }
 
         #[test]
