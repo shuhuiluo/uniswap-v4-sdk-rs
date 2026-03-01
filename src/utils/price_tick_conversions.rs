@@ -1,8 +1,8 @@
 //! ## Price and tick conversions
 //! Utility functions for converting between [`I24`] ticks and SDK Core [`Price`] prices.
 
-use crate::prelude::{sorts_before, Error};
-use alloy_primitives::{aliases::I24, U160};
+use crate::prelude::{Error, sorts_before};
+use alloy_primitives::{U160, aliases::I24};
 use uniswap_sdk_core::prelude::*;
 use uniswap_v3_sdk::prelude::*;
 

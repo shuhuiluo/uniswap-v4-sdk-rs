@@ -26,7 +26,7 @@ use alloy::{
     providers::Provider,
     rpc::types::{Filter, TransactionReceipt},
 };
-use alloy_primitives::{aliases::I24, Address, ChainId, B256, I256, U256};
+use alloy_primitives::{Address, B256, ChainId, I256, U256, aliases::I24};
 use alloy_sol_types::SolEvent;
 
 /// Fetches position data from the position manager NFT and creates a Position.

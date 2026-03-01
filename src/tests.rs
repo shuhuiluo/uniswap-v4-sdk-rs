@@ -3,7 +3,7 @@
 
 use crate::entities::Pool;
 pub(crate) use alloc::vec;
-use alloy_primitives::{address, Address, U160};
+use alloy_primitives::{Address, U160, address};
 use once_cell::sync::Lazy;
 use uniswap_sdk_core::{prelude::*, token};
 use uniswap_v3_sdk::prelude::*;

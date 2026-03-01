@@ -5,7 +5,7 @@
 use crate::{entities::pool::Pool, prelude::*};
 use alloc::string::{String, ToString};
 use alloy::{eips::BlockId, network::Network, providers::Provider};
-use alloy_primitives::{aliases::U24, Address, ChainId};
+use alloy_primitives::{Address, ChainId, aliases::U24};
 use uniswap_sdk_core::{
     prelude::{Currency, Ether, Token},
     token,
@@ -204,7 +204,7 @@ where
 mod tests {
     use super::*;
     use crate::tests::*;
-    use alloy::providers::{layers::CallBatchLayer, ProviderBuilder};
+    use alloy::providers::{ProviderBuilder, layers::CallBatchLayer};
     use uniswap_v3_sdk::{constants::FeeAmount, entities::TickDataProvider};
 
     const FEE: FeeAmount = FeeAmount::LOW;

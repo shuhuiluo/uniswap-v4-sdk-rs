@@ -34,6 +34,13 @@ When updating this, also update:
 
 The current MSRV (minimum supported Rust version) is 1.88.
 
+To avoid transitive dependencies requiring a newer `rustc`, use edition 2024 or add to `.cargo/config.toml`:
+
+```toml
+[resolver]
+incompatible-rust-versions = "fallback"
+```
+
 ## Getting started
 
 Add the following to your `Cargo.toml` file:

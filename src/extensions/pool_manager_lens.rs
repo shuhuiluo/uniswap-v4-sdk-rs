@@ -12,8 +12,9 @@ use alloy::{
     uint,
 };
 use alloy_primitives::{
+    Address, B256, U160, U256,
     aliases::{I24, U24},
-    keccak256, Address, B256, U160, U256,
+    keccak256,
 };
 use alloy_sol_types::SolValue;
 use uniswap_v3_sdk::prelude::*;
