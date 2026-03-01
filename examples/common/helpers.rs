@@ -3,14 +3,14 @@
 use super::{constants::PERMIT2_ADDRESS, tokens::ETHER};
 use alloy::{
     network::TransactionBuilder,
-    providers::{ext::AnvilApi, Provider},
+    providers::{Provider, ext::AnvilApi},
     rpc::types::TransactionRequest,
-    signers::{local::PrivateKeySigner, SignerSync},
-    sol_types::{eip712_domain, Eip712Domain, SolStruct},
+    signers::{SignerSync, local::PrivateKeySigner},
+    sol_types::{Eip712Domain, SolStruct, eip712_domain},
 };
 use alloy_primitives::{
+    Address, B256, Bytes, Signature, U160, U256,
     aliases::{U24, U48},
-    Address, Bytes, Signature, B256, U160, U256,
 };
 use alloy_sol_types::SolCall;
 use uniswap_sdk_core::prelude::*;

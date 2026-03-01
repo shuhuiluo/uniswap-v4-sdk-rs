@@ -1,7 +1,7 @@
 //! Common constants used across examples
 
 use alloy::{eips::BlockId, transports::http::reqwest::Url};
-use alloy_primitives::{address, Address};
+use alloy_primitives::{Address, address};
 use once_cell::sync::Lazy;
 use uniswap_sdk_core::addresses::CHAIN_TO_ADDRESSES_MAP;
 

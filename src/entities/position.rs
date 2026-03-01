@@ -1,8 +1,9 @@
-use crate::prelude::{tick_to_price, Error, Pool, *};
+use crate::prelude::{Error, Pool, tick_to_price, *};
 use alloc::vec;
 use alloy_primitives::{
+    U160, U256,
     aliases::{I24, U48},
-    keccak256, uint, U160, U256,
+    keccak256, uint,
 };
 use alloy_sol_types::SolValue;
 use uniswap_sdk_core::prelude::*;

@@ -1,7 +1,7 @@
 [package]
 name = "uniswap-v4-sdk"
-version = "1.0.0"
-edition = "2021"
+version = "1.1.0"
+edition = "2024"
 rust-version = "1.88"
 authors = ["Shuhui Luo <twitter.com/aureliano_law>"]
 description = "Uniswap V4 SDK for Rust"
@@ -24,7 +24,7 @@ derive_more = { version = "2", default-features = false, features = ["deref", "d
 thiserror = { version = "2", default-features = false }
 tokio = { version = "1.47", optional = true, default-features = false, features = ["macros"] }
 uniswap-sdk-core = "6.0.0"
-uniswap-v3-sdk = "6.0.0"
+uniswap-v3-sdk = "6.1.0"
 
 [dev-dependencies]
 alloy = { version = "1.0.23", default-features = false, features = ["provider-anvil-node", "reqwest-rustls-tls", "signer-local"] }

@@ -1,5 +1,5 @@
 use crate::prelude::{Error, *};
-use alloy_primitives::{aliases::U24, keccak256, uint, Address, ChainId, B256, I256, U160};
+use alloy_primitives::{Address, B256, ChainId, I256, U160, aliases::U24, keccak256, uint};
 use alloy_sol_types::SolValue;
 use uniswap_sdk_core::prelude::*;
 use uniswap_v3_sdk::prelude::*;

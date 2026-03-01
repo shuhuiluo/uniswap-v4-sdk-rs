@@ -2,7 +2,7 @@
 
 use super::constants::RPC_URL;
 use alloy::{
-    providers::{ext::AnvilApi, Provider, ProviderBuilder},
+    providers::{Provider, ProviderBuilder, ext::AnvilApi},
     signers::local::PrivateKeySigner,
 };
 use alloy_primitives::U256;

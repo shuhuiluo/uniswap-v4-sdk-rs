@@ -2,13 +2,13 @@
 //! A data provider that fetches tick data from the Uniswap V4 pool manager contract on the fly
 //! using [`PoolManagerLens`].
 
-use crate::prelude::{map_contract_error, PoolManagerLens};
+use crate::prelude::{PoolManagerLens, map_contract_error};
 use alloy::{
     eips::BlockId,
     network::{Ethereum, Network},
     providers::Provider,
 };
-use alloy_primitives::{aliases::I24, Address, B256, U256};
+use alloy_primitives::{Address, B256, U256, aliases::I24};
 use uniswap_v3_sdk::prelude::*;
 
 #[derive(Clone, Debug)]

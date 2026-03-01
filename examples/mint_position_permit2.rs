@@ -1,12 +1,12 @@
 use alloy::{
     network::TransactionBuilder,
     node_bindings::WEI_IN_ETHER,
-    providers::{ext::AnvilApi, Provider},
+    providers::{Provider, ext::AnvilApi},
     rpc::types::TransactionRequest,
 };
 use alloy_primitives::aliases::U48;
 use uniswap_sdk_core::prelude::*;
-use uniswap_v3_sdk::prelude::{nearest_usable_tick, FeeAmount, MintAmounts};
+use uniswap_v3_sdk::prelude::{FeeAmount, MintAmounts, nearest_usable_tick};
 use uniswap_v4_sdk::{extensions::get_first_token_id_from_transaction, prelude::*};
 
 #[path = "common/mod.rs"]

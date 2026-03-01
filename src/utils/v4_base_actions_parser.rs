@@ -24,7 +24,7 @@ pub fn parse_calldata(calldata: &Bytes) -> Result<V4RouterCall, Error> {
 mod tests {
     use super::*;
     use crate::{create_route, prelude::*, tests::*};
-    use alloy_primitives::{address, uint, Address, U256};
+    use alloy_primitives::{Address, U256, address, uint};
     use once_cell::sync::Lazy;
     use uniswap_v3_sdk::prelude::FeeAmount;
 
