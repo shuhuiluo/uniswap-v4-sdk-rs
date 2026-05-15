@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use alloc::vec::Vec;
 use alloy_primitives::ChainId;
-use uniswap_sdk_core::prelude::{BaseCurrency, Currency, Price};
+use uniswap_sdk_core::prelude::{BaseCurrency, BaseCurrencyCore, Currency, Price};
 use uniswap_v3_sdk::entities::TickDataProvider;
 
 /// Represents a list of pools through which a swap can occur
@@ -41,14 +41,28 @@ where
     pub fn new(pools: Vec<Pool<TP>>, input: TInput, output: TOutput) -> Result<Self, Error> {
         assert!(!pools.is_empty(), "POOLS");
 
-        let chain_id = pools[0].chain_id();
+        let first_pool = &pools[0];
+        let chain_id = first_pool.chain_id();
         let all_on_same_chain = pools.iter().all(|pool| pool.chain_id() == chain_id);
         assert!(all_on_same_chain, "CHAIN_IDS");
 
         // throws if pools do not involve the input and output currency or the native/wrapped
         // equivalent
-        let path_input = get_path_currency(&input, &pools[0])?;
+        let mut path_input = get_path_currency(&input, first_pool)?;
         let path_output = get_path_currency(&output, pools.last().unwrap())?;
+
+        // If the input is native and the first pool is an ETH-WETH pool, that means we already
+        // wrapped the input to WETH, so we need to set path_input to the wrapped input.
+        if first_pool.currency0.wrapped().equals(&first_pool.currency1)
+            && let Some(next_pool) = pools.get(1)
+        {
+            let next_pool_uses_native = next_pool.currency0.is_native();
+            if path_input.is_native() && next_pool_uses_native {
+                path_input = first_pool.currency1.clone();
+            } else if path_input.equals(&first_pool.currency1) && !next_pool_uses_native {
+                path_input = first_pool.currency0.clone();
+            }
+        }
 
         let mut current_input_currency = &path_input;
         for pool in &pools {
@@ -479,6 +493,60 @@ mod tests {
             assert_eq!(route.input, CURRENCY0.clone());
             assert_eq!(route.path_input, CURRENCY0.clone());
             assert_eq!(route.output, WETH.clone());
+            assert_eq!(route.path_output, ETHER.clone().into());
+        }
+
+        #[test]
+        fn supports_ether_input_with_eth_weth_first_pool_eth_second_pool() {
+            let route = create_route!(POOL_ETH_WETH, POOL_0_ETH; ETHER, CURRENCY0);
+            assert_eq!(route.input, ETHER.clone());
+            assert_eq!(route.path_input, WETH.clone().into());
+            assert_eq!(route.output, CURRENCY0.clone());
+            assert_eq!(route.path_output, CURRENCY0.clone());
+        }
+
+        #[test]
+        fn supports_weth_input_with_eth_weth_first_pool_weth_second_pool() {
+            let route = create_route!(POOL_ETH_WETH, POOL_0_WETH; WETH, CURRENCY0);
+            assert_eq!(route.input, WETH.clone());
+            assert_eq!(route.path_input, ETHER.clone().into());
+            assert_eq!(route.output, CURRENCY0.clone());
+            assert_eq!(route.path_output, CURRENCY0.clone());
+        }
+
+        #[test]
+        fn supports_ether_input_with_eth_weth_first_pool_weth_second_pool() {
+            let route = create_route!(POOL_ETH_WETH, POOL_0_WETH; ETHER, CURRENCY0);
+            assert_eq!(route.input, ETHER.clone());
+            assert_eq!(route.path_input, ETHER.clone().into());
+            assert_eq!(route.output, CURRENCY0.clone());
+            assert_eq!(route.path_output, CURRENCY0.clone());
+        }
+
+        #[test]
+        fn supports_weth_input_with_eth_weth_first_pool_eth_second_pool() {
+            let route = create_route!(POOL_ETH_WETH, POOL_0_ETH; WETH, CURRENCY0);
+            assert_eq!(route.input, WETH.clone());
+            assert_eq!(route.path_input, WETH.clone().into());
+            assert_eq!(route.output, CURRENCY0.clone());
+            assert_eq!(route.path_output, CURRENCY0.clone());
+        }
+
+        #[test]
+        fn eth_weth_eth_input() {
+            let route = create_route!(POOL_ETH_WETH, ETHER, WETH);
+            assert_eq!(route.input, ETHER.clone());
+            assert_eq!(route.path_input, ETHER.clone().into());
+            assert_eq!(route.output, WETH.clone());
+            assert_eq!(route.path_output, WETH.clone().into());
+        }
+
+        #[test]
+        fn eth_weth_weth_input() {
+            let route = create_route!(POOL_ETH_WETH, WETH, ETHER);
+            assert_eq!(route.input, WETH.clone());
+            assert_eq!(route.path_input, WETH.clone().into());
+            assert_eq!(route.output, ETHER.clone());
             assert_eq!(route.path_output, ETHER.clone().into());
         }
     }

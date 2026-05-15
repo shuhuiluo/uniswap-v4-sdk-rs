@@ -578,8 +578,37 @@ where
                 // Account for trades that wrap/unwrap as a last step
                 let mut token_amount =
                     amount_with_path_currency(&amount, route.pools.last().unwrap())?;
-                for pool in route.pools.iter().rev() {
+                for (i, pool) in route.pools.iter().enumerate().rev() {
                     (token_amount, _) = pool.get_input_amount(&token_amount, None).await?;
+                    let is_last_pool = i == route.pools.len() - 1;
+                    let is_eth_weth_pool = pool.currency1.equals(pool.currency0.wrapped());
+
+                    // Exact-output swaps walk pools backward. If the terminal pool is ETH-WETH,
+                    // retype the amount for the previous pool in route order: ETH for native
+                    // pools, or WETH for wrapped pools.
+                    if is_last_pool && is_eth_weth_pool {
+                        let previous_pool = i.checked_sub(1).and_then(|j| route.pools.get(j));
+                        let currency = previous_pool.and_then(|previous_pool| {
+                            let previous_pool_uses_native = previous_pool.currency0.is_native();
+                            if route.output.is_native() && previous_pool_uses_native {
+                                Some(pool.currency0.clone())
+                            } else if route.output.equals(&pool.currency1)
+                                && !previous_pool_uses_native
+                            {
+                                Some(pool.currency1.clone())
+                            } else {
+                                None
+                            }
+                        });
+
+                        if let Some(currency) = currency {
+                            token_amount = CurrencyAmount::from_fractional_amount(
+                                currency,
+                                token_amount.numerator,
+                                token_amount.denominator,
+                            )?;
+                        }
+                    }
                 }
                 input_amount = CurrencyAmount::from_fractional_amount(
                     route.input.clone(),
@@ -898,6 +927,7 @@ mod tests {
     define_pool!(POOL_ETH_1, ETHER, 100000, TOKEN1, 100000);
     define_pool!(POOL_ETH_2, ETHER, 100000, TOKEN2, 100000);
     define_pool!(POOL_WETH_0, WETH, 100000, TOKEN0, 100000);
+    define_pool!(POOL_ETH_WETH, ETHER, 100000, WETH, 100000);
 
     static ROUTE_0_1: Lazy<Route<Token, Token, TickListDataProvider>> =
         Lazy::new(|| create_route!(POOL_0_1, TOKEN0, TOKEN1));
@@ -1024,6 +1054,50 @@ mod tests {
             );
             assert_eq!(trade.input_currency().clone(), TOKEN0.clone());
             assert_eq!(trade.output_currency().clone(), ETHER.clone());
+        }
+
+        #[tokio::test]
+        async fn can_be_constructed_with_ether_as_output_for_exact_output_with_eth_weth_pool() {
+            let trade = trade_from_route!(
+                create_route!(POOL_WETH_0, POOL_ETH_WETH; TOKEN0, ETHER),
+                ETHER_AMOUNT_10000.clone(),
+                TradeType::ExactOutput
+            );
+            assert_eq!(trade.input_currency().clone(), TOKEN0.clone());
+            assert_eq!(trade.output_currency().clone(), ETHER.clone());
+        }
+
+        #[tokio::test]
+        async fn can_be_constructed_with_weth_as_output_for_exact_output_with_eth_weth_pool() {
+            let trade = trade_from_route!(
+                create_route!(POOL_ETH_0, POOL_ETH_WETH; TOKEN0, WETH),
+                currency_amount!(WETH, 10000),
+                TradeType::ExactOutput
+            );
+            assert_eq!(trade.input_currency().clone(), TOKEN0.clone());
+            assert_eq!(trade.output_currency().clone(), WETH.clone());
+        }
+
+        #[tokio::test]
+        async fn exact_output_ether_from_single_eth_weth_pool() {
+            let trade = trade_from_route!(
+                create_route!(POOL_ETH_WETH, WETH, ETHER),
+                ETHER_AMOUNT_10000.clone(),
+                TradeType::ExactOutput
+            );
+            assert_eq!(trade.input_currency().clone(), WETH.clone());
+            assert_eq!(trade.output_currency().clone(), ETHER.clone());
+        }
+
+        #[tokio::test]
+        async fn exact_output_weth_from_single_eth_weth_pool() {
+            let trade = trade_from_route!(
+                create_route!(POOL_ETH_WETH, ETHER, WETH),
+                currency_amount!(WETH, 10000),
+                TradeType::ExactOutput
+            );
+            assert_eq!(trade.input_currency().clone(), ETHER.clone());
+            assert_eq!(trade.output_currency().clone(), WETH.clone());
         }
     }
 
