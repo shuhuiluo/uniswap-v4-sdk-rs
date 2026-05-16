@@ -75,6 +75,15 @@ sol! {
     }
 
     #[derive(Debug, Default, PartialEq, Eq)]
+    struct SwapExactInParamsV2_1 {
+        address currencyIn;
+        PathKey[] path;
+        uint256[] maxHopSlippage;
+        uint128 amountIn;
+        uint128 amountOutMinimum;
+    }
+
+    #[derive(Debug, Default, PartialEq, Eq)]
     struct SwapExactOutSingleParams {
         PoolKey poolKey;
         bool zeroForOne;
@@ -87,6 +96,15 @@ sol! {
     struct SwapExactOutParams {
         address currencyOut;
         PathKey[] path;
+        uint128 amountOut;
+        uint128 amountInMaximum;
+    }
+
+    #[derive(Debug, Default, PartialEq, Eq)]
+    struct SwapExactOutParamsV2_1 {
+        address currencyOut;
+        PathKey[] path;
+        uint256[] maxHopSlippage;
         uint128 amountOut;
         uint128 amountInMaximum;
     }

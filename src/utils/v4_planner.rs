@@ -1,8 +1,42 @@
 use crate::prelude::{Error, Trade, encode_route_to_path, *};
 use alloy_primitives::{Bytes, U256};
 use alloy_sol_types::SolValue;
+use derive_more::From;
 use uniswap_sdk_core::prelude::*;
 use uniswap_v3_sdk::prelude::*;
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum URVersion {
+    #[default]
+    V2_0,
+    V2_1,
+}
+
+#[derive(Clone, Debug, From, PartialEq)]
+pub enum SwapExactIn {
+    V2_0(SwapExactInParams),
+    V2_1(SwapExactInParamsV2_1),
+}
+
+impl Default for SwapExactIn {
+    #[inline]
+    fn default() -> Self {
+        Self::V2_0(SwapExactInParams::default())
+    }
+}
+
+#[derive(Clone, Debug, From, PartialEq)]
+pub enum SwapExactOut {
+    V2_0(SwapExactOutParams),
+    V2_1(SwapExactOutParamsV2_1),
+}
+
+impl Default for SwapExactOut {
+    #[inline]
+    fn default() -> Self {
+        Self::V2_0(SwapExactOutParams::default())
+    }
+}
 
 #[allow(non_camel_case_types)]
 #[derive(Clone, Debug, PartialEq)]
@@ -16,9 +50,9 @@ pub enum Actions {
     BURN_POSITION(BurnPositionParams) = 0x03,
     // Swapping
     SWAP_EXACT_IN_SINGLE(SwapExactInSingleParams) = 0x06,
-    SWAP_EXACT_IN(SwapExactInParams) = 0x07,
+    SWAP_EXACT_IN(SwapExactIn) = 0x07,
     SWAP_EXACT_OUT_SINGLE(SwapExactOutSingleParams) = 0x08,
-    SWAP_EXACT_OUT(SwapExactOutParams) = 0x09,
+    SWAP_EXACT_OUT(SwapExactOut) = 0x09,
 
     // Closing deltas on the pool manager
     // Settling
@@ -58,9 +92,11 @@ impl Actions {
             Self::MINT_POSITION(params) => params.abi_encode_params(),
             Self::BURN_POSITION(params) => params.abi_encode_params(),
             Self::SWAP_EXACT_IN_SINGLE(params) => params.abi_encode(),
-            Self::SWAP_EXACT_IN(params) => params.abi_encode(),
+            Self::SWAP_EXACT_IN(SwapExactIn::V2_0(params)) => params.abi_encode(),
+            Self::SWAP_EXACT_IN(SwapExactIn::V2_1(params)) => params.abi_encode(),
             Self::SWAP_EXACT_OUT_SINGLE(params) => params.abi_encode(),
-            Self::SWAP_EXACT_OUT(params) => params.abi_encode(),
+            Self::SWAP_EXACT_OUT(SwapExactOut::V2_0(params)) => params.abi_encode(),
+            Self::SWAP_EXACT_OUT(SwapExactOut::V2_1(params)) => params.abi_encode(),
             Self::SETTLE(params) => params.abi_encode_params(),
             Self::SETTLE_ALL(params) => params.abi_encode_params(),
             Self::SETTLE_PAIR(params) => params.abi_encode_params(),
@@ -76,7 +112,7 @@ impl Actions {
     }
 
     #[inline]
-    pub fn abi_decode(command: u8, data: &Bytes) -> Result<Self, Error> {
+    pub fn abi_decode(command: u8, data: &Bytes, version: URVersion) -> Result<Self, Error> {
         let data = data.iter().as_slice();
         Ok(match command {
             0x00 => {
@@ -88,11 +124,17 @@ impl Actions {
             0x02 => Self::MINT_POSITION(MintPositionParams::abi_decode_params_validate(data)?),
             0x03 => Self::BURN_POSITION(BurnPositionParams::abi_decode_params_validate(data)?),
             0x06 => Self::SWAP_EXACT_IN_SINGLE(SwapExactInSingleParams::abi_decode_validate(data)?),
-            0x07 => Self::SWAP_EXACT_IN(SwapExactInParams::abi_decode_validate(data)?),
+            0x07 => Self::SWAP_EXACT_IN(match version {
+                URVersion::V2_0 => SwapExactInParams::abi_decode_validate(data)?.into(),
+                URVersion::V2_1 => SwapExactInParamsV2_1::abi_decode_validate(data)?.into(),
+            }),
             0x08 => {
                 Self::SWAP_EXACT_OUT_SINGLE(SwapExactOutSingleParams::abi_decode_validate(data)?)
             }
-            0x09 => Self::SWAP_EXACT_OUT(SwapExactOutParams::abi_decode_validate(data)?),
+            0x09 => Self::SWAP_EXACT_OUT(match version {
+                URVersion::V2_0 => SwapExactOutParams::abi_decode_validate(data)?.into(),
+                URVersion::V2_1 => SwapExactOutParamsV2_1::abi_decode_validate(data)?.into(),
+            }),
             0x0b => Self::SETTLE(SettleParams::abi_decode_params_validate(data)?),
             0x0c => Self::SETTLE_ALL(SettleAllParams::abi_decode_params_validate(data)?),
             0x0d => Self::SETTLE_PAIR(SettlePairParams::abi_decode_params_validate(data)?),
@@ -127,6 +169,8 @@ impl V4Planner {
         &mut self,
         trade: &Trade<TInput, TOutput, TP>,
         slippage_tolerance: Option<Percent>,
+        max_hop_slippage: Option<Vec<U256>>,
+        version: URVersion,
     ) -> Result<&mut Self, Error>
     where
         TInput: BaseCurrency,
@@ -149,39 +193,75 @@ impl V4Planner {
         );
 
         let route = trade.route();
-        let currency_in = currency_address(&route.path_input);
-        let currency_out = currency_address(&route.path_output);
         let path = encode_route_to_path(route, exact_output);
+        let max_hop_slippage = max_hop_slippage.unwrap_or_default();
 
-        Ok(self.add_action(
-            &(if exact_output {
-                Actions::SWAP_EXACT_OUT(SwapExactOutParams {
-                    currencyOut: currency_out,
-                    path,
-                    amountOut: trade.output_amount()?.quotient().to_u128().unwrap(),
-                    amountInMaximum: trade
-                        .maximum_amount_in(slippage_tolerance.unwrap_or_default(), None)?
-                        .quotient()
-                        .to_u128()
-                        .unwrap(),
-                })
+        let action = if exact_output {
+            let currency_out = currency_address(&route.path_output);
+            let amount_out = trade.output_amount()?.quotient().to_u128().unwrap();
+            let amount_in_maximum = trade
+                .maximum_amount_in(slippage_tolerance.unwrap_or_default(), None)?
+                .quotient()
+                .to_u128()
+                .unwrap();
+
+            match version {
+                URVersion::V2_0 => Actions::SWAP_EXACT_OUT(
+                    SwapExactOutParams {
+                        currencyOut: currency_out,
+                        path,
+                        amountOut: amount_out,
+                        amountInMaximum: amount_in_maximum,
+                    }
+                    .into(),
+                ),
+                URVersion::V2_1 => Actions::SWAP_EXACT_OUT(
+                    SwapExactOutParamsV2_1 {
+                        currencyOut: currency_out,
+                        path,
+                        maxHopSlippage: max_hop_slippage,
+                        amountOut: amount_out,
+                        amountInMaximum: amount_in_maximum,
+                    }
+                    .into(),
+                ),
+            }
+        } else {
+            let currency_in = currency_address(&route.path_input);
+            let amount_in = trade.input_amount()?.quotient().to_u128().unwrap();
+            let amount_out_minimum = if let Some(slippage_tolerance) = slippage_tolerance {
+                trade
+                    .minimum_amount_out(slippage_tolerance, None)?
+                    .quotient()
+                    .to_u128()
+                    .unwrap()
             } else {
-                Actions::SWAP_EXACT_IN(SwapExactInParams {
-                    currencyIn: currency_in,
-                    path,
-                    amountIn: trade.input_amount()?.quotient().to_u128().unwrap(),
-                    amountOutMinimum: if let Some(slippage_tolerance) = slippage_tolerance {
-                        trade
-                            .minimum_amount_out(slippage_tolerance, None)?
-                            .quotient()
-                            .to_u128()
-                            .unwrap()
-                    } else {
-                        0
-                    },
-                })
-            }),
-        ))
+                0
+            };
+
+            match version {
+                URVersion::V2_0 => Actions::SWAP_EXACT_IN(
+                    SwapExactInParams {
+                        currencyIn: currency_in,
+                        path,
+                        amountIn: amount_in,
+                        amountOutMinimum: amount_out_minimum,
+                    }
+                    .into(),
+                ),
+                URVersion::V2_1 => Actions::SWAP_EXACT_IN(
+                    SwapExactInParamsV2_1 {
+                        currencyIn: currency_in,
+                        path,
+                        maxHopSlippage: max_hop_slippage,
+                        amountIn: amount_in,
+                        amountOutMinimum: amount_out_minimum,
+                    }
+                    .into(),
+                ),
+            }
+        };
+        Ok(self.add_action(&action))
     }
 
     #[inline]
@@ -240,6 +320,7 @@ fn currency_address(currency: &impl BaseCurrency) -> Address {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::create_route;
     use crate::{prelude::Pool, tests::*};
     use alloy_primitives::{hex, uint};
     use once_cell::sync::Lazy;
@@ -336,21 +417,77 @@ mod tests {
         assert_eq!(discriminant(&Actions::UNWRAP(U256::ZERO)), 0x16);
     }
 
-    #[test]
-    fn test_add_action_encode_v4_exact_in_single_swap() {
-        let mut planner = V4Planner::default();
-        planner.add_action(&Actions::SWAP_EXACT_IN_SINGLE(SwapExactInSingleParams {
-            poolKey: USDC_WETH.pool_key.clone(),
-            zeroForOne: true,
-            amountIn: ONE_ETHER,
-            amountOutMinimum: ONE_ETHER / 2,
-            hookData: Bytes::default(),
-        }));
-        assert_eq!(planner.actions, vec![0x06]);
-        assert_eq!(
+    mod add_action {
+        use super::*;
+
+        #[test]
+        fn encode_v4_exact_in_single_swap() {
+            let mut planner = V4Planner::default();
+            planner.add_action(&Actions::SWAP_EXACT_IN_SINGLE(SwapExactInSingleParams {
+                poolKey: USDC_WETH.pool_key.clone(),
+                zeroForOne: true,
+                amountIn: ONE_ETHER,
+                amountOutMinimum: ONE_ETHER / 2,
+                hookData: Bytes::default(),
+            }));
+            assert_eq!(planner.actions, vec![0x06]);
+            assert_eq!(
             planner.params[0],
             hex!("0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20000000000000000000000000000000000000000000000000000000000000bb8000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000de0b6b3a764000000000000000000000000000000000000000000000000000006f05b59d3b2000000000000000000000000000000000000000000000000000000000000000001200000000000000000000000000000000000000000000000000000000000000000").to_vec()
         );
+        }
+
+        #[test]
+        fn encode_v4_exact_in_swap_v2_1() {
+            let route = create_route!(DAI_USDC, USDC_WETH; DAI, WETH);
+            let max_hop_slippage = vec![uint!(10000_U256), uint!(20000_U256)];
+            let mut planner = V4Planner::default();
+
+            planner.add_action(&Actions::SWAP_EXACT_IN(
+                SwapExactInParamsV2_1 {
+                    currencyIn: DAI.address,
+                    path: encode_route_to_path(&route, false),
+                    maxHopSlippage: max_hop_slippage.clone(),
+                    amountIn: ONE_ETHER,
+                    amountOutMinimum: 0,
+                }
+                .into(),
+            ));
+
+            assert_eq!(planner.actions, vec![0x07]);
+            let decoded =
+                SwapExactInParamsV2_1::abi_decode_validate(planner.params[0].iter().as_slice())
+                    .unwrap();
+            assert_eq!(decoded.currencyIn, DAI.address);
+            assert_eq!(decoded.maxHopSlippage, max_hop_slippage);
+            assert_eq!(decoded.amountIn, ONE_ETHER);
+        }
+
+        #[test]
+        fn encode_v4_exact_out_swap_v2_1() {
+            let route = create_route!(DAI_USDC, USDC_WETH; DAI, WETH);
+            let max_hop_slippage = vec![uint!(15000_U256), uint!(25000_U256)];
+            let mut planner = V4Planner::default();
+
+            planner.add_action(&Actions::SWAP_EXACT_OUT(
+                SwapExactOutParamsV2_1 {
+                    currencyOut: WETH.address,
+                    path: encode_route_to_path(&route, true),
+                    maxHopSlippage: max_hop_slippage.clone(),
+                    amountOut: ONE_ETHER,
+                    amountInMaximum: 2 * ONE_ETHER,
+                }
+                .into(),
+            ));
+
+            assert_eq!(planner.actions, vec![0x09]);
+            let decoded =
+                SwapExactOutParamsV2_1::abi_decode_validate(planner.params[0].iter().as_slice())
+                    .unwrap();
+            assert_eq!(decoded.currencyOut, WETH.address);
+            assert_eq!(decoded.maxHopSlippage, max_hop_slippage);
+            assert_eq!(decoded.amountOut, ONE_ETHER);
+        }
     }
 
     mod add_settle {
@@ -442,7 +579,7 @@ mod tests {
 
     mod add_trade {
         use super::*;
-        use crate::{create_route, currency_amount, trade_from_route};
+        use crate::{currency_amount, trade_from_route};
 
         #[tokio::test]
         async fn completes_v4_exact_in_2_hop_swap_same_results_as_add_action() {
@@ -450,12 +587,15 @@ mod tests {
 
             // encode with addAction function
             let mut planner = V4Planner::default();
-            planner.add_action(&Actions::SWAP_EXACT_IN(SwapExactInParams {
-                currencyIn: DAI.address,
-                path: encode_route_to_path(&route, false),
-                amountIn: ONE_ETHER,
-                amountOutMinimum: 0,
-            }));
+            planner.add_action(&Actions::SWAP_EXACT_IN(
+                SwapExactInParams {
+                    currencyIn: DAI.address,
+                    path: encode_route_to_path(&route, false),
+                    amountIn: ONE_ETHER,
+                    amountOutMinimum: 0,
+                }
+                .into(),
+            ));
 
             // encode with addTrade function
             let trade = trade_from_route!(
@@ -464,7 +604,9 @@ mod tests {
                 TradeType::ExactInput
             );
             let mut trade_planner = V4Planner::default();
-            trade_planner.add_trade(&trade, None).unwrap();
+            trade_planner
+                .add_trade(&trade, None, None, URVersion::default())
+                .unwrap();
 
             assert_eq!(planner.actions, vec![0x07]);
             assert_eq!(
@@ -473,6 +615,29 @@ mod tests {
             );
             assert_eq!(planner.actions, trade_planner.actions);
             assert_eq!(planner.params[0], trade_planner.params[0]);
+        }
+
+        #[tokio::test]
+        async fn completes_v4_exact_in_2_hop_swap_v2_0_without_max_hop_slippage() {
+            let route = create_route!(DAI_USDC, USDC_WETH; DAI, WETH);
+            let trade = trade_from_route!(
+                route,
+                currency_amount!(DAI, ONE_ETHER),
+                TradeType::ExactInput
+            );
+            let mut planner = V4Planner::default();
+
+            planner
+                .add_trade(&trade, None, None, URVersion::default())
+                .unwrap();
+
+            assert_eq!(planner.actions, vec![0x07]);
+            let decoded =
+                SwapExactInParams::abi_decode_validate(planner.params[0].iter().as_slice())
+                    .unwrap();
+            assert_eq!(decoded.currencyIn, DAI.address);
+            // The V2.0 ABI type has no maxHopSlippage field.
+            assert_eq!(decoded.amountIn, ONE_ETHER);
         }
 
         #[tokio::test]
@@ -485,9 +650,14 @@ mod tests {
                 TradeType::ExactOutput
             );
             let mut planner = V4Planner::default();
-            planner.add_trade(&trade, Some(slippage_tolerance)).unwrap();
+            planner
+                .add_trade(&trade, Some(slippage_tolerance), None, URVersion::default())
+                .unwrap();
 
             assert_eq!(planner.actions, vec![0x09]);
+            let _decoded =
+                SwapExactOutParams::abi_decode_validate(planner.params[0].iter().as_slice())
+                    .unwrap();
             assert_eq!(
                 planner.params[0],
                 hex!("0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc200000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000de0b6b3a76400000000000000000000000000000000000000000000000000000ea8d524a2a4ae240000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000001000000000000000000000000006b175474e89094c44da98b954eedeac495271d0f0000000000000000000000000000000000000000000000000000000000000bb8000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb480000000000000000000000000000000000000000000000000000000000000bb8000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000000").to_vec()
@@ -504,9 +674,14 @@ mod tests {
                 TradeType::ExactOutput
             );
             let mut planner = V4Planner::default();
-            planner.add_trade(&trade, Some(slippage_tolerance)).unwrap();
+            planner
+                .add_trade(&trade, Some(slippage_tolerance), None, URVersion::default())
+                .unwrap();
 
             assert_eq!(planner.actions, vec![0x09]);
+            let _decoded =
+                SwapExactOutParams::abi_decode_validate(planner.params[0].iter().as_slice())
+                    .unwrap();
             assert_eq!(
                 planner.params[0],
                 hex!("0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc200000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000de0b6b3a76400000000000000000000000000000000000000000000000000000ea8d524a2a4ae240000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000001000000000000000000000000006b175474e89094c44da98b954eedeac495271d0f0000000000000000000000000000000000000000000000000000000000000bb8000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb480000000000000000000000000000000000000000000000000000000000000bb8000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000000").to_vec()
@@ -523,9 +698,14 @@ mod tests {
                 TradeType::ExactInput
             );
             let mut planner = V4Planner::default();
-            planner.add_trade(&trade, Some(slippage_tolerance)).unwrap();
+            planner
+                .add_trade(&trade, Some(slippage_tolerance), None, URVersion::default())
+                .unwrap();
 
             assert_eq!(planner.actions, vec![0x07]);
+            let _decoded =
+                SwapExactInParams::abi_decode_validate(planner.params[0].iter().as_slice())
+                    .unwrap();
             assert_eq!(
                 planner.params[0],
                 hex!("0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc200000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000de0b6b3a76400000000000000000000000000000000000000000000000000000d23441c93fad7ca000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000100000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb480000000000000000000000000000000000000000000000000000000000000bb8000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006b175474e89094c44da98b954eedeac495271d0f0000000000000000000000000000000000000000000000000000000000000bb8000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000000").to_vec()
@@ -541,7 +721,9 @@ mod tests {
                 currency_amount!(WETH, ONE_ETHER),
                 TradeType::ExactOutput
             );
-            V4Planner::default().add_trade(&trade, None).unwrap();
+            V4Planner::default()
+                .add_trade(&trade, None, None, URVersion::default())
+                .unwrap();
         }
 
         #[tokio::test]
@@ -560,8 +742,87 @@ mod tests {
             .await
             .unwrap();
             V4Planner::default()
-                .add_trade(&trade, Some(slippage_tolerance))
+                .add_trade(&trade, Some(slippage_tolerance), None, URVersion::default())
                 .unwrap();
+        }
+
+        #[tokio::test]
+        async fn completes_v4_exact_in_2_hop_swap_with_max_hop_slippage_v2_1() {
+            let route = create_route!(DAI_USDC, USDC_WETH; DAI, WETH);
+            let trade = trade_from_route!(
+                route,
+                currency_amount!(DAI, ONE_ETHER),
+                TradeType::ExactInput
+            );
+            let max_hop_slippage = vec![uint!(10000_U256), uint!(20000_U256)];
+            let mut planner = V4Planner::default();
+
+            planner
+                .add_trade(
+                    &trade,
+                    None,
+                    Some(max_hop_slippage.clone()),
+                    URVersion::V2_1,
+                )
+                .unwrap();
+
+            assert_eq!(planner.actions, vec![0x07]);
+            let decoded =
+                SwapExactInParamsV2_1::abi_decode_validate(planner.params[0].iter().as_slice())
+                    .unwrap();
+            assert_eq!(decoded.currencyIn, DAI.address);
+            assert_eq!(decoded.maxHopSlippage, max_hop_slippage);
+        }
+
+        #[tokio::test]
+        async fn completes_v4_exact_out_2_hop_swap_with_max_hop_slippage_v2_1() {
+            let route = create_route!(DAI_USDC, USDC_WETH; DAI, WETH);
+            let slippage_tolerance = Percent::new(5, 100);
+            let trade = trade_from_route!(
+                route,
+                currency_amount!(WETH, ONE_ETHER),
+                TradeType::ExactOutput
+            );
+            let max_hop_slippage = vec![uint!(10000_U256), uint!(20000_U256)];
+            let mut planner = V4Planner::default();
+
+            planner
+                .add_trade(
+                    &trade,
+                    Some(slippage_tolerance),
+                    Some(max_hop_slippage.clone()),
+                    URVersion::V2_1,
+                )
+                .unwrap();
+
+            assert_eq!(planner.actions, vec![0x09]);
+            let decoded =
+                SwapExactOutParamsV2_1::abi_decode_validate(planner.params[0].iter().as_slice())
+                    .unwrap();
+            assert_eq!(decoded.currencyOut, WETH.address);
+            assert_eq!(decoded.maxHopSlippage, max_hop_slippage);
+        }
+
+        #[tokio::test]
+        async fn completes_v4_exact_in_swap_with_empty_max_hop_slippage_v2_1() {
+            let route = create_route!(DAI_USDC, USDC_WETH; DAI, WETH);
+            let trade = trade_from_route!(
+                route,
+                currency_amount!(DAI, ONE_ETHER),
+                TradeType::ExactInput
+            );
+            let mut planner = V4Planner::default();
+
+            planner
+                .add_trade(&trade, None, None, URVersion::V2_1)
+                .unwrap();
+
+            assert_eq!(planner.actions, vec![0x07]);
+            let decoded =
+                SwapExactInParamsV2_1::abi_decode_validate(planner.params[0].iter().as_slice())
+                    .unwrap();
+            assert_eq!(decoded.currencyIn, DAI.address);
+            assert!(decoded.maxHopSlippage.is_empty());
         }
     }
 }
