@@ -31,6 +31,10 @@ pub enum Error {
     #[error("Invalid currency")]
     InvalidCurrency,
 
+    /// Thrown when decoded calldata has different action and parameter counts.
+    #[error("Mismatched action and parameter counts")]
+    MismatchedActionParams,
+
     /// Thrown when trying to simulate a swap with an unsupported hook.
     #[error("Unsupported hook")]
     UnsupportedHook,
