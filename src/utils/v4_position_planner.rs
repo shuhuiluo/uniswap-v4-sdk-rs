@@ -98,6 +98,11 @@ impl V4PositionPlanner {
     }
 
     #[inline]
+    pub fn add_close_currency(&mut self, currency: &impl BaseCurrency) {
+        self.add_action(&Actions::CLOSE_CURRENCY(to_address(currency)));
+    }
+
+    #[inline]
     pub fn add_take_pair(
         &mut self,
         currency0: &impl BaseCurrency,

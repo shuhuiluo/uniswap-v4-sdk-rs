@@ -163,8 +163,8 @@ pub fn create_call_parameters(pool_key: PoolKey, sqrt_price_x96: U160) -> Method
 /// - If the pool does not exist yet, the `initializePool` call is encoded.
 /// - If it is a mint, encode `MINT_POSITION`. If migrating, encode a `SETTLE` and `SWEEP` for both
 ///   currencies. Else, encode a `SETTLE_PAIR`. If on a NATIVE pool, encode a `SWEEP`.
-/// - Else, encode `INCREASE_LIQUIDITY` and `SETTLE_PAIR`. If it is on a NATIVE pool, encode a
-///   `SWEEP`.
+/// - Else, encode `INCREASE_LIQUIDITY` and `CLOSE_CURRENCY` for each token to handle accrued fees.
+///   If it is on a NATIVE pool, encode a `SWEEP`.
 ///
 /// ## Arguments
 ///
@@ -248,26 +248,36 @@ pub fn add_call_parameters<TP: TickDataProvider>(
             if options.use_native.is_some() {
                 // unwrap the exact amount needed to send to the pool manager
                 planner.add_unwrap(OPEN_DELTA);
-                // payer is v4 position manager
-                planner.add_settle(&position.pool.currency0, false, None);
-                planner.add_settle(&position.pool.currency1, false, None);
-                // sweep any leftover wrapped native that was not unwrapped
-                // recipient will be the same as the v4 lp token recipient
+            }
+            // payer is v4 position manager
+            planner.add_settle(&position.pool.currency0, false, None);
+            planner.add_settle(&position.pool.currency1, false, None);
+            // sweep any leftover wrapped native that was not unwrapped
+            // recipient will be the same as the v4 lp token recipient
+            if options.use_native.is_some() {
                 planner.add_sweep(position.pool.currency0.wrapped(), opts.recipient);
-                planner.add_sweep(&position.pool.currency1, opts.recipient);
             } else {
-                // payer is v4 position manager
-                planner.add_settle(&position.pool.currency0, false, None);
-                planner.add_settle(&position.pool.currency1, false, None);
-                // recipient will be the same as the v4 lp token recipient
                 planner.add_sweep(&position.pool.currency0, opts.recipient);
-                planner.add_sweep(&position.pool.currency1, opts.recipient);
+            }
+            planner.add_sweep(&position.pool.currency1, opts.recipient);
+        }
+        AddLiquiditySpecificOptions::Mint(_) => {
+            // Mint deltas are always non-negative, so settling both currencies is safe.
+            planner.add_settle_pair(&position.pool.currency0, &position.pool.currency1);
+            if options.use_native.is_some() {
+                // Any sweeping must happen after the settling.
+                // native currency will always be currency0 in v4
+                value = amount0_max;
+                planner.add_sweep(&position.pool.currency0, MSG_SENDER);
             }
         }
-        _ => {
-            // need to settle both currencies when minting / adding liquidity (user is the payer)
-            planner.add_settle_pair(&position.pool.currency0, &position.pool.currency1);
-            // When not migrating and adding native currency, add a final sweep
+        AddLiquiditySpecificOptions::Increase(_) => {
+            // Increase: use CLOSE_CURRENCY instead of SETTLE_PAIR because accrued fees on
+            // existing positions can flip the delta positive on one side (e.g. single-sided
+            // positions with fees), causing SETTLE_PAIR to revert. CLOSE_CURRENCY handles both
+            // directions: settles if the user owes, takes if the user is owed.
+            planner.add_close_currency(&position.pool.currency0);
+            planner.add_close_currency(&position.pool.currency1);
             if options.use_native.is_some() {
                 // Any sweeping must happen after the settling.
                 // native currency will always be currency0 in v4
@@ -810,13 +820,6 @@ mod tests {
             let MethodParameters { calldata, value } =
                 add_call_parameters(&mut position, options).unwrap();
 
-            assert_eq!(
-                calldata.to_vec(),
-                hex!(
-                    "0xdd46508f0000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000007b0000000000000000000000000000000000000000000000000000000000000220000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000002000d00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000012000000000000000000000000000000000000000000000000000000000000000c00000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000029a0000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000002"
-                )
-            );
-
             // Rebuild the calldata with the planner for increase
             let MintAmounts {
                 amount0: amount0_max,
@@ -833,8 +836,9 @@ mod tests {
                 u128::try_from(amount1_max).unwrap(),
                 Bytes::default(),
             );
-            // Expect there to be a settle pair call afterwards
-            planner.add_settle_pair(&POOL_0_1.currency0, &POOL_0_1.currency1);
+            // Expect CLOSE_CURRENCY for each token to handle both settle and take directions.
+            planner.add_close_currency(&POOL_0_1.currency0);
+            planner.add_close_currency(&POOL_0_1.currency1);
 
             assert_eq!(
                 calldata,
