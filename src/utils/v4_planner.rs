@@ -10,11 +10,12 @@ pub enum URVersion {
     #[default]
     V2_0,
     V2_1_1,
+    V2_2_0,
 }
 
 #[inline]
 const fn is_v2_1_1_or_later(v: URVersion) -> bool {
-    matches!(v, URVersion::V2_1_1)
+    matches!(v, URVersion::V2_1_1 | URVersion::V2_2_0)
 }
 
 #[derive(Clone, Debug, From, PartialEq)]
@@ -264,7 +265,7 @@ impl V4Planner {
                     }
                     .into(),
                 ),
-                URVersion::V2_1_1 => Actions::SWAP_EXACT_OUT(
+                URVersion::V2_1_1 | URVersion::V2_2_0 => Actions::SWAP_EXACT_OUT(
                     SwapExactOutParamsV2_1_1 {
                         currencyOut: currency_out,
                         path,
@@ -298,7 +299,7 @@ impl V4Planner {
                     }
                     .into(),
                 ),
-                URVersion::V2_1_1 => Actions::SWAP_EXACT_IN(
+                URVersion::V2_1_1 | URVersion::V2_2_0 => Actions::SWAP_EXACT_IN(
                     SwapExactInParamsV2_1_1 {
                         currencyIn: currency_in,
                         path,
