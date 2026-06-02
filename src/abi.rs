@@ -67,6 +67,16 @@ sol! {
     }
 
     #[derive(Debug, Default, PartialEq, Eq)]
+    struct SwapExactInSingleParamsV2_1_1 {
+        PoolKey poolKey;
+        bool zeroForOne;
+        uint128 amountIn;
+        uint128 amountOutMinimum;
+        uint256 minHopPriceX36;
+        bytes hookData;
+    }
+
+    #[derive(Debug, Default, PartialEq, Eq)]
     struct SwapExactInParams {
         address currencyIn;
         PathKey[] path;
@@ -75,10 +85,10 @@ sol! {
     }
 
     #[derive(Debug, Default, PartialEq, Eq)]
-    struct SwapExactInParamsV2_1 {
+    struct SwapExactInParamsV2_1_1 {
         address currencyIn;
         PathKey[] path;
-        uint256[] maxHopSlippage;
+        uint256[] minHopPriceX36;
         uint128 amountIn;
         uint128 amountOutMinimum;
     }
@@ -93,6 +103,16 @@ sol! {
     }
 
     #[derive(Debug, Default, PartialEq, Eq)]
+    struct SwapExactOutSingleParamsV2_1_1 {
+        PoolKey poolKey;
+        bool zeroForOne;
+        uint128 amountOut;
+        uint128 amountInMaximum;
+        uint256 minHopPriceX36;
+        bytes hookData;
+    }
+
+    #[derive(Debug, Default, PartialEq, Eq)]
     struct SwapExactOutParams {
         address currencyOut;
         PathKey[] path;
@@ -101,10 +121,10 @@ sol! {
     }
 
     #[derive(Debug, Default, PartialEq, Eq)]
-    struct SwapExactOutParamsV2_1 {
+    struct SwapExactOutParamsV2_1_1 {
         address currencyOut;
         PathKey[] path;
-        uint256[] maxHopSlippage;
+        uint256[] minHopPriceX36;
         uint128 amountOut;
         uint128 amountInMaximum;
     }

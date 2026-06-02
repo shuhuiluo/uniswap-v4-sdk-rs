@@ -108,24 +108,58 @@ mod tests {
                 URVersion::default(),
             ),
             (
-                Actions::SWAP_EXACT_IN_SINGLE(SwapExactInSingleParams {
-                    poolKey: USDC_WETH.pool_key.clone(),
-                    zeroForOne: true,
-                    amountIn: AMOUNT.try_into().unwrap(),
-                    amountOutMinimum: AMOUNT.try_into().unwrap(),
-                    hookData: Bytes::default(),
-                }),
+                Actions::SWAP_EXACT_IN_SINGLE(
+                    SwapExactInSingleParams {
+                        poolKey: USDC_WETH.pool_key.clone(),
+                        zeroForOne: true,
+                        amountIn: AMOUNT.try_into().unwrap(),
+                        amountOutMinimum: AMOUNT.try_into().unwrap(),
+                        hookData: Bytes::default(),
+                    }
+                    .into(),
+                ),
                 URVersion::default(),
             ),
             (
-                Actions::SWAP_EXACT_OUT_SINGLE(SwapExactOutSingleParams {
-                    poolKey: USDC_WETH.pool_key.clone(),
-                    zeroForOne: true,
-                    amountOut: AMOUNT.try_into().unwrap(),
-                    amountInMaximum: AMOUNT.try_into().unwrap(),
-                    hookData: Bytes::default(),
-                }),
+                Actions::SWAP_EXACT_OUT_SINGLE(
+                    SwapExactOutSingleParams {
+                        poolKey: USDC_WETH.pool_key.clone(),
+                        zeroForOne: true,
+                        amountOut: AMOUNT.try_into().unwrap(),
+                        amountInMaximum: AMOUNT.try_into().unwrap(),
+                        hookData: Bytes::default(),
+                    }
+                    .into(),
+                ),
                 URVersion::default(),
+            ),
+            (
+                Actions::SWAP_EXACT_IN_SINGLE(
+                    SwapExactInSingleParamsV2_1_1 {
+                        poolKey: USDC_WETH.pool_key.clone(),
+                        zeroForOne: true,
+                        amountIn: AMOUNT.try_into().unwrap(),
+                        amountOutMinimum: AMOUNT.try_into().unwrap(),
+                        minHopPriceX36: uint!(5000_U256),
+                        hookData: Bytes::default(),
+                    }
+                    .into(),
+                ),
+                URVersion::V2_1_1,
+            ),
+            (
+                Actions::SWAP_EXACT_OUT_SINGLE(
+                    SwapExactOutSingleParamsV2_1_1 {
+                        poolKey: USDC_WETH.pool_key.clone(),
+                        zeroForOne: true,
+                        amountOut: AMOUNT.try_into().unwrap(),
+                        amountInMaximum: AMOUNT.try_into().unwrap(),
+                        minHopPriceX36: uint!(5000_U256),
+                        hookData: Bytes::default(),
+                    }
+                    .into(),
+                ),
+                URVersion::V2_1_1,
             ),
             (
                 Actions::SWAP_EXACT_IN(
@@ -153,42 +187,42 @@ mod tests {
             ),
             (
                 Actions::SWAP_EXACT_IN(
-                    SwapExactInParamsV2_1 {
+                    SwapExactInParamsV2_1_1 {
                         currencyIn: DAI.address,
                         path: encode_route_to_path(&route, false),
-                        maxHopSlippage: vec![uint!(10000_U256), uint!(20000_U256)],
+                        minHopPriceX36: vec![uint!(10000_U256), uint!(20000_U256)],
                         amountIn: AMOUNT.try_into().unwrap(),
                         amountOutMinimum: 0,
                     }
                     .into(),
                 ),
-                URVersion::V2_1,
+                URVersion::V2_1_1,
             ),
             (
                 Actions::SWAP_EXACT_OUT(
-                    SwapExactOutParamsV2_1 {
+                    SwapExactOutParamsV2_1_1 {
                         currencyOut: WETH.address,
                         path: encode_route_to_path(&route, true),
-                        maxHopSlippage: vec![uint!(15000_U256), uint!(25000_U256)],
+                        minHopPriceX36: vec![uint!(15000_U256), uint!(25000_U256)],
                         amountOut: AMOUNT.try_into().unwrap(),
                         amountInMaximum: AMOUNT.try_into().unwrap(),
                     }
                     .into(),
                 ),
-                URVersion::V2_1,
+                URVersion::V2_1_1,
             ),
             (
                 Actions::SWAP_EXACT_IN(
-                    SwapExactInParamsV2_1 {
+                    SwapExactInParamsV2_1_1 {
                         currencyIn: DAI.address,
                         path: encode_route_to_path(&route, false),
-                        maxHopSlippage: Vec::new(),
+                        minHopPriceX36: Vec::new(),
                         amountIn: AMOUNT.try_into().unwrap(),
                         amountOutMinimum: 0,
                     }
                     .into(),
                 ),
-                URVersion::V2_1,
+                URVersion::V2_1_1,
             ),
         ];
 
