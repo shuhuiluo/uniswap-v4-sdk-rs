@@ -387,9 +387,19 @@ where
         if self.trade_type == TradeType::ExactOutput {
             return Ok(output_amount);
         }
-        output_amount
-            .multiply(&((Percent::new(1, 1) + slippage_tolerance).invert()))
-            .map_err(|e| e.into())
+        let one = Percent::new(1, 1);
+        if slippage_tolerance >= one {
+            return CurrencyAmount::from_raw_amount(output_amount.currency.clone(), 0)
+                .map_err(|e| e.into());
+        }
+        let slippage_adjusted_amount_out = output_amount
+            .multiply(&(one - slippage_tolerance))?
+            .quotient();
+        CurrencyAmount::from_raw_amount(
+            output_amount.currency.clone(),
+            slippage_adjusted_amount_out,
+        )
+        .map_err(|e| e.into())
     }
 
     /// Get the minimum amount that must be received from this trade for the given slippage
@@ -414,9 +424,19 @@ where
         if self.trade_type == TradeType::ExactOutput {
             return Ok(output_amount);
         }
-        output_amount
-            .multiply(&((Percent::new(1, 1) + slippage_tolerance).invert()))
-            .map_err(|e| e.into())
+        let one = Percent::new(1, 1);
+        if slippage_tolerance >= one {
+            return CurrencyAmount::from_raw_amount(output_amount.currency.clone(), 0)
+                .map_err(|e| e.into());
+        }
+        let slippage_adjusted_amount_out = output_amount
+            .multiply(&(one - slippage_tolerance))?
+            .quotient();
+        CurrencyAmount::from_raw_amount(
+            output_amount.currency.clone(),
+            slippage_adjusted_amount_out,
+        )
+        .map_err(|e| e.into())
     }
 
     /// Get the maximum amount in that can be spent via this trade for the given slippage tolerance
@@ -1430,13 +1450,13 @@ mod tests {
                     EXACT_IN
                         .worst_execution_price(Percent::new(5, 100))
                         .unwrap(),
-                    Price::new(TOKEN0.clone(), TOKEN2.clone(), 10500, 6900)
+                    Price::new(TOKEN0.clone(), TOKEN2.clone(), 100, 65)
                 );
                 assert_eq!(
                     EXACT_IN
                         .worst_execution_price(Percent::new(200, 100))
                         .unwrap(),
-                    Price::new(TOKEN0.clone(), TOKEN2.clone(), 100, 23)
+                    Price::new(TOKEN0.clone(), TOKEN2.clone(), 100, 0)
                 );
             }
 
@@ -1452,13 +1472,13 @@ mod tests {
                     EXACT_IN_MULTI_ROUTE
                         .worst_execution_price(Percent::new(5, 100))
                         .unwrap(),
-                    Price::new(TOKEN0.clone(), TOKEN2.clone(), 10500, 6900)
+                    Price::new(TOKEN0.clone(), TOKEN2.clone(), 100, 65)
                 );
                 assert_eq!(
                     EXACT_IN_MULTI_ROUTE
                         .worst_execution_price(Percent::new(200, 100))
                         .unwrap(),
-                    Price::new(TOKEN0.clone(), TOKEN2.clone(), 100, 23)
+                    Price::new(TOKEN0.clone(), TOKEN2.clone(), 100, 0)
                 );
             }
         }
@@ -2152,13 +2172,21 @@ mod tests {
                     trade
                         .minimum_amount_out(Percent::new(5, 100), None)
                         .unwrap(),
-                    CurrencyAmount::from_fractional_amount(TOKEN2.clone(), 700400, 105).unwrap()
+                    currency_amount!(TOKEN2, 6653)
                 );
                 assert_eq!(
                     trade
                         .minimum_amount_out(Percent::new(200, 100), None)
                         .unwrap(),
-                    CurrencyAmount::from_fractional_amount(TOKEN2.clone(), 700400, 300).unwrap()
+                    currency_amount!(TOKEN2, 0)
+                );
+
+                let mut cached_trade = trade.clone();
+                assert_eq!(
+                    cached_trade
+                        .minimum_amount_out_cached(Percent::new(5, 100), None)
+                        .unwrap(),
+                    currency_amount!(TOKEN2, 6653)
                 );
             }
         }
