@@ -370,8 +370,7 @@ fn currency_address(currency: &impl BaseCurrency) -> Address {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::create_route;
-    use crate::{prelude::Pool, tests::*};
+    use crate::{create_route, prelude::Pool, tests::*};
     use alloy_primitives::{hex, uint};
     use once_cell::sync::Lazy;
 
