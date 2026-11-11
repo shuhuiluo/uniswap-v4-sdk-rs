@@ -506,8 +506,8 @@ pub fn encode_erc721_permit(
 /// ## Examples
 ///
 /// ```
-/// use alloy::signers::{local::PrivateKeySigner, SignerSync};
-/// use alloy_primitives::{address, b256, uint, Signature, B256};
+/// use alloy::signers::{SignerSync, local::PrivateKeySigner};
+/// use alloy_primitives::{B256, Signature, address, b256, uint};
 /// use alloy_sol_types::SolStruct;
 /// use uniswap_v4_sdk::prelude::*;
 ///

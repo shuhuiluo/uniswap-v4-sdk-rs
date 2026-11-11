@@ -84,14 +84,14 @@ impl Pool {
             }
         );
 
-        let (sqrt_price_x96, _, _, _) = slot0?;
+        let (sqrt_price_x96, tick, protocol_fee, lp_fee) = slot0?;
         let liquidity = liquidity?;
 
         if sqrt_price_x96.is_zero() {
             return Err(Error::PoolNotInitialized);
         }
 
-        Self::new(
+        let mut pool = Self::new(
             create_currency(chain_id, currency_a, token_a_data?),
             create_currency(chain_id, currency_b, token_b_data?),
             fee,
@@ -99,7 +99,10 @@ impl Pool {
             hooks,
             sqrt_price_x96,
             liquidity,
-        )
+        )?
+        .with_fees(lp_fee, protocol_fee)?;
+        pool.tick_current = tick.as_i32();
+        Ok(pool)
     }
 }
 
@@ -151,7 +154,7 @@ where
             block_id,
         )
         .await?;
-        Self::new_with_tick_data_provider(
+        let mut result = Self::new_with_tick_data_provider(
             pool.currency0,
             pool.currency1,
             pool.fee,
@@ -160,7 +163,13 @@ where
             pool.sqrt_price_x96,
             pool.liquidity,
             SimpleTickDataProvider::new(manager, pool.pool_id, provider, block_id),
-        )
+        )?
+        .with_fees(
+            pool.lp_fee.ok_or(Error::UnresolvedDynamicFee)?,
+            pool.protocol_fee,
+        )?;
+        result.tick_current = I::from_i24(pool.tick_current.to_i24());
+        Ok(result)
     }
 }
 

@@ -95,3 +95,22 @@ This project is inspired by and adapted from the following projects:
 - [Uniswap V4 SDK](https://github.com/Uniswap/sdks)
 - [Uniswap V3 SDK Rust](https://github.com/shuhuiluo/uniswap-v3-sdk-rs)
 - [Uniswap SDK Core Rust](https://github.com/malik672/uniswap-sdk-core-rust)
+
+## Pool fee snapshots
+
+`Pool::fee` represents the fee encoded in the pool key. Quotes use the current
+`lp_fee` and packed directional `protocol_fee`, which can be set with `with_fees`.
+Static constructors initialize the LP fee from the pool-key fee and assume zero
+protocol fees. Dynamic pools require a resolved LP fee before quoting. The
+extensions loader reads the tick and both fee values from the same slot0 snapshot.
+
+The combined swap fee is computed independently for each direction while the
+pool key and pool ID retain their identity. Hooks with swap permissions remain
+unsupported by off-chain quoting.
+
+`Pool` has two additional public fields and the error enum has additional variants.
+Callers using exhaustive struct literals or matches need to update them. Existing
+constructor argument lists are preserved.
+
+Independent v4-core fixtures and regeneration instructions are in
+[`tests/oracle`](tests/oracle/README.md).

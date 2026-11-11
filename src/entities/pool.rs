@@ -14,7 +14,12 @@ where
 {
     pub currency0: Currency,
     pub currency1: Currency,
+    /// PoolKey fee (the dynamic flag for dynamic-fee pools).
     pub fee: U24,
+    /// Current LP fee used for quotes, unresolved until loaded for dynamic pools.
+    pub lp_fee: Option<U24>,
+    /// Packed directional protocol fees: low 12 bits for zero-for-one.
+    pub protocol_fee: U24,
     pub tick_spacing: TP::Index,
     pub sqrt_price_x96: U160,
     pub hooks: Address,
@@ -34,6 +39,8 @@ where
         self.currency0 == other.currency0
             && self.currency1 == other.currency1
             && self.fee == other.fee
+            && self.lp_fee == other.lp_fee
+            && self.protocol_fee == other.protocol_fee
             && self.tick_spacing == other.tick_spacing
             && self.sqrt_price_x96 == other.sqrt_price_x96
             && self.hooks == other.hooks
@@ -158,7 +165,10 @@ impl<TP: TickDataProvider> Pool<TP> {
         liquidity: u128,
         tick_data_provider: TP,
     ) -> Result<Self, Error> {
-        assert!(fee == DYANMIC_FEE_FLAG || fee < uint!(1_000_000_U24), "FEE");
+        assert!(
+            fee == DYANMIC_FEE_FLAG || fee <= uint!(1_000_000_U24),
+            "FEE"
+        );
         if fee == DYANMIC_FEE_FLAG {
             assert_ne!(hooks, Address::ZERO, "Dynamic fee pool requires a hook");
         }
@@ -175,6 +185,8 @@ impl<TP: TickDataProvider> Pool<TP> {
             currency0,
             currency1,
             fee,
+            lp_fee: (fee != DYANMIC_FEE_FLAG).then_some(fee),
+            protocol_fee: U24::ZERO,
             tick_spacing,
             sqrt_price_x96,
             hooks,
@@ -184,6 +196,44 @@ impl<TP: TickDataProvider> Pool<TP> {
             pool_key,
             pool_id,
         })
+    }
+
+    /// Set the current LP fee and packed directional protocol fees without changing pool identity.
+    #[inline]
+    pub fn with_fees(mut self, lp_fee: U24, protocol_fee: U24) -> Result<Self, Error> {
+        let packed = protocol_fee.to::<u32>();
+        if (self.fee != DYANMIC_FEE_FLAG && lp_fee != self.fee)
+            || lp_fee > uint!(1_000_000_U24)
+            || packed & 0xfff > 1000
+            || packed >> 12 > 1000
+        {
+            return Err(Error::InvalidFee);
+        }
+        self.lp_fee = Some(lp_fee);
+        self.protocol_fee = protocol_fee;
+        Ok(self)
+    }
+
+    /// The total input fee, applying protocol fees before LP fees as in v4-core.
+    #[inline]
+    pub fn swap_fee(&self, zero_for_one: bool) -> Result<U24, Error> {
+        let lp_fee = self.lp_fee.ok_or(Error::UnresolvedDynamicFee)?.to::<u32>();
+        let packed = self.protocol_fee.to::<u32>();
+        let protocol_fee = if zero_for_one {
+            packed & 0xfff
+        } else {
+            packed >> 12
+        };
+        if (self.fee != DYANMIC_FEE_FLAG && lp_fee != self.fee.to::<u32>())
+            || lp_fee > 1_000_000
+            || packed & 0xfff > 1000
+            || packed >> 12 > 1000
+        {
+            return Err(Error::InvalidFee);
+        }
+        Ok(U24::from(
+            protocol_fee + lp_fee - protocol_fee * lp_fee / 1_000_000,
+        ))
     }
 
     #[inline]
@@ -302,8 +352,14 @@ impl<TP: TickDataProvider> Pool<TP> {
         sqrt_price_limit_x96: Option<U160>,
     ) -> Result<SwapState<TP::Index>, Error> {
         if !self.hook_impacts_swap() {
+            let fee = self.swap_fee(zero_for_one)?;
+            if fee == uint!(1_000_000_U24) {
+                return self
+                    .swap_full_fee(zero_for_one, amount_specified, sqrt_price_limit_x96)
+                    .await;
+            }
             Ok(v3_swap(
-                self.fee,
+                fee,
                 self.sqrt_price_x96,
                 self.tick_current,
                 self.liquidity,
@@ -317,6 +373,87 @@ impl<TP: TickDataProvider> Pool<TP> {
         } else {
             Err(Error::UnsupportedHook)
         }
+    }
+
+    // A 100% fee cannot use v3's step math, which divides by the fee complement.
+    // Tick traversal follows uniswap-v3-sdk's MIT-licensed v3_swap implementation.
+    async fn swap_full_fee(
+        &self,
+        zero_for_one: bool,
+        amount_specified: I256,
+        sqrt_price_limit_x96: Option<U160>,
+    ) -> Result<SwapState<TP::Index>, Error> {
+        if amount_specified < I256::ZERO {
+            return Err(Error::InvalidFeeForExactOutput);
+        }
+        // Reuse the shared price-limit validation without taking a swap step.
+        let mut state = v3_swap(
+            U24::ZERO,
+            self.sqrt_price_x96,
+            self.tick_current,
+            self.liquidity,
+            self.tick_spacing,
+            &self.tick_data_provider,
+            zero_for_one,
+            I256::ZERO,
+            sqrt_price_limit_x96,
+        )
+        .await?;
+        state.amount_specified_remaining = amount_specified;
+        let limit = sqrt_price_limit_x96.unwrap_or(if zero_for_one {
+            MIN_SQRT_RATIO + U160::from(1)
+        } else {
+            MAX_SQRT_RATIO - U160::from(1)
+        });
+        while !state.amount_specified_remaining.is_zero() && state.sqrt_price_x96 != limit {
+            let (tick, initialized) = self
+                .tick_data_provider
+                .next_initialized_tick_within_one_word(
+                    state.tick_current,
+                    zero_for_one,
+                    self.tick_spacing,
+                )
+                .await?;
+            let tick = TP::Index::from_i24(tick.to_i24().clamp(MIN_TICK, MAX_TICK));
+            let next = get_sqrt_ratio_at_tick(tick.to_i24())?;
+            let target = if zero_for_one {
+                next.max(limit)
+            } else {
+                next.min(limit)
+            };
+            let amount_in = if zero_for_one {
+                get_amount_0_delta(target, state.sqrt_price_x96, state.liquidity, true)?
+            } else {
+                get_amount_1_delta(state.sqrt_price_x96, target, state.liquidity, true)?
+            };
+            if !amount_in.is_zero() {
+                // No input remains after the fee; price stays put and the entire input is fee.
+                state.amount_specified_remaining = I256::ZERO;
+                break;
+            }
+            state.sqrt_price_x96 = target;
+            if target == next {
+                if initialized {
+                    let liquidity_net = self.tick_data_provider.get_tick(tick).await?.liquidity_net;
+                    state.liquidity = add_delta(
+                        state.liquidity,
+                        if zero_for_one {
+                            -liquidity_net
+                        } else {
+                            liquidity_net
+                        },
+                    )?;
+                }
+                state.tick_current = if zero_for_one {
+                    tick - TP::Index::ONE
+                } else {
+                    tick
+                };
+            } else {
+                state.tick_current = TP::Index::from_i24(target.get_tick_at_sqrt_ratio()?);
+            }
+        }
+        Ok(state)
     }
 
     const fn hook_impacts_swap(&self) -> bool {
@@ -357,7 +494,7 @@ impl<TP: Clone + TickDataProvider> Pool<TP> {
             amount_calculated: output_amount,
             sqrt_price_x96,
             liquidity,
-            ..
+            tick_current,
         } = self
             .swap(
                 zero_for_one,
@@ -379,7 +516,7 @@ impl<TP: Clone + TickDataProvider> Pool<TP> {
             CurrencyAmount::from_raw_amount(output_currency, -output_amount.to_big_int())?,
             Self {
                 sqrt_price_x96,
-                tick_current: TP::Index::from_i24(sqrt_price_x96.get_tick_at_sqrt_ratio()?),
+                tick_current,
                 liquidity,
                 ..self.clone()
             },
@@ -418,7 +555,7 @@ impl<TP: Clone + TickDataProvider> Pool<TP> {
             amount_calculated: input_amount,
             sqrt_price_x96,
             liquidity,
-            ..
+            tick_current,
         } = self
             .swap(
                 zero_for_one,
@@ -440,7 +577,7 @@ impl<TP: Clone + TickDataProvider> Pool<TP> {
             CurrencyAmount::from_raw_amount(input_currency, input_amount.to_big_int())?,
             Self {
                 sqrt_price_x96,
-                tick_current: TP::Index::from_i24(sqrt_price_x96.get_tick_at_sqrt_ratio()?),
+                tick_current,
                 liquidity,
                 ..self.clone()
             },
@@ -453,6 +590,287 @@ mod tests {
     use super::*;
     use crate::{currency_amount, tests::*};
     use alloy_primitives::b256;
+
+    #[tokio::test]
+    async fn issue74_protocol_fee_and_dynamic_fee() {
+        let pool = Pool::new_with_tick_data_provider(
+            TOKEN0.clone().into(),
+            TOKEN1.clone().into(),
+            uint!(3000_U24),
+            10,
+            Address::ZERO,
+            *SQRT_PRICE_1_1,
+            1000 * ONE_ETHER,
+            vec![
+                Tick {
+                    index: -887270,
+                    liquidity_net: (1000 * ONE_ETHER) as i128,
+                    liquidity_gross: 1000 * ONE_ETHER,
+                },
+                Tick {
+                    index: 887270,
+                    liquidity_net: -((1000 * ONE_ETHER) as i128),
+                    liquidity_gross: 1000 * ONE_ETHER,
+                },
+            ],
+        )
+        .unwrap();
+        let identity = pool.pool_id;
+        let pool = pool
+            .with_fees(uint!(3000_U24), U24::from(1000 + (500 << 12)))
+            .unwrap();
+        assert_eq!(pool.pool_id, identity);
+        assert_eq!(pool.swap_fee(true).unwrap(), uint!(3997_U24));
+        assert_eq!(pool.swap_fee(false).unwrap(), uint!(3499_U24));
+        let (output, _) = pool
+            .get_output_amount(&currency_amount!(TOKEN0, ONE_ETHER), None)
+            .await
+            .unwrap();
+        assert_eq!(
+            output.quotient(),
+            BigInt::from_u128(995011965097726768_u128).unwrap()
+        );
+        let mut dynamic = pool.clone();
+        dynamic.fee = DYANMIC_FEE_FLAG;
+        dynamic.lp_fee = None;
+        assert!(matches!(
+            dynamic.swap_fee(true),
+            Err(Error::UnresolvedDynamicFee)
+        ));
+        assert_eq!(
+            dynamic
+                .with_fees(uint!(3000_U24), uint!(1000_U24))
+                .unwrap()
+                .swap_fee(true)
+                .unwrap(),
+            uint!(3997_U24)
+        );
+        assert!(
+            pool.clone()
+                .with_fees(uint!(3000_U24), uint!(1001_U24))
+                .is_err()
+        );
+        assert!(pool.with_fees(uint!(1_000_001_U24), U24::ZERO).is_err());
+    }
+
+    #[tokio::test]
+    async fn issue74_boundary_tick_is_preserved() {
+        let mut ticks = TICK_LIST.clone();
+        ticks.insert(
+            1,
+            Tick {
+                index: -10,
+                liquidity_net: 0,
+                liquidity_gross: 1,
+            },
+        );
+        let pool = Pool::new_with_tick_data_provider(
+            TOKEN0.clone().into(),
+            TOKEN1.clone().into(),
+            uint!(3000_U24),
+            10,
+            Address::ZERO,
+            *SQRT_PRICE_1_1,
+            ONE_ETHER,
+            ticks,
+        )
+        .unwrap();
+        let limit = get_sqrt_ratio_at_tick((-10_i32).to_i24()).unwrap();
+        let (_, quoted) = pool
+            .get_output_amount(&currency_amount!(TOKEN0, ONE_ETHER), Some(limit))
+            .await
+            .unwrap();
+        assert_eq!(quoted.tick_current, -11);
+    }
+
+    fn full_fee_test_pool(liquidity: u128, ticks: Vec<Tick>) -> Pool<Vec<Tick>> {
+        Pool::new_with_tick_data_provider(
+            TOKEN0.clone().into(),
+            TOKEN1.clone().into(),
+            uint!(1_000_000_U24),
+            10,
+            Address::ZERO,
+            *SQRT_PRICE_1_1,
+            liquidity,
+            ticks,
+        )
+        .unwrap()
+    }
+
+    #[tokio::test]
+    async fn issue74_full_fee_traverses_empty_ranges_both_directions() {
+        for zero_for_one in [true, false] {
+            let direction = if zero_for_one { -1 } else { 1 };
+            let limit = get_sqrt_ratio_at_tick((direction * 5_i32).to_i24()).unwrap();
+            let pool = full_fee_test_pool(
+                0,
+                vec![
+                    Tick {
+                        index: -100,
+                        liquidity_net: 0,
+                        liquidity_gross: 1,
+                    },
+                    Tick {
+                        index: 100,
+                        liquidity_net: 0,
+                        liquidity_gross: 1,
+                    },
+                ],
+            );
+            let state = pool
+                .swap(zero_for_one, I256::from_raw(U256::from(100)), Some(limit))
+                .await
+                .unwrap();
+            assert_eq!(state.sqrt_price_x96, limit);
+            assert_eq!(state.tick_current, direction * 5);
+            assert_eq!(
+                state.amount_specified_remaining,
+                I256::from_raw(U256::from(100))
+            );
+            assert_eq!(state.amount_calculated, I256::ZERO);
+
+            let ticks = vec![
+                Tick {
+                    index: -10,
+                    liquidity_net: 1000,
+                    liquidity_gross: 1000,
+                },
+                Tick {
+                    index: 10,
+                    liquidity_net: -1000,
+                    liquidity_gross: 1000,
+                },
+            ];
+            // Outside the funded range, crossing its nearest boundary restores liquidity.
+            let mut pool = full_fee_test_pool(0, ticks);
+            pool.sqrt_price_x96 = get_sqrt_ratio_at_tick((direction * 20_i32).to_i24()).unwrap();
+            pool.tick_current = direction * 20;
+            let state = pool
+                .swap(
+                    !zero_for_one,
+                    I256::from_raw(U256::from(100)),
+                    Some(*SQRT_PRICE_1_1),
+                )
+                .await
+                .unwrap();
+            assert_eq!(
+                state.sqrt_price_x96,
+                get_sqrt_ratio_at_tick((direction * 10_i32).to_i24()).unwrap()
+            );
+            assert_eq!(state.tick_current, if zero_for_one { -10 } else { 9 });
+            assert_eq!(state.liquidity, 1000);
+            assert_eq!(state.amount_specified_remaining, I256::ZERO);
+            assert_eq!(state.amount_calculated, I256::ZERO);
+        }
+    }
+
+    #[tokio::test]
+    async fn issue74_full_fee_crosses_same_price_boundary_and_rejects_exact_output() {
+        let ticks = vec![
+            Tick {
+                index: -10,
+                liquidity_net: 1000,
+                liquidity_gross: 1000,
+            },
+            Tick {
+                index: 0,
+                liquidity_net: -1000,
+                liquidity_gross: 1000,
+            },
+        ];
+        let pool = full_fee_test_pool(1000, ticks);
+        let state = pool
+            .swap(true, I256::from_raw(U256::from(100)), None)
+            .await
+            .unwrap();
+        assert_eq!(state.sqrt_price_x96, *SQRT_PRICE_1_1);
+        assert_eq!(state.tick_current, -1);
+        assert_eq!(state.liquidity, 2000);
+        assert_eq!(state.amount_specified_remaining, I256::ZERO);
+        assert!(matches!(
+            pool.swap(true, -I256::ONE, None).await,
+            Err(Error::InvalidFeeForExactOutput)
+        ));
+    }
+
+    #[tokio::test]
+    #[should_panic(expected = "RATIO_CURRENT")]
+    async fn issue74_full_fee_validates_price_limit() {
+        let pool = full_fee_test_pool(0, TICK_LIST.clone());
+        let _ = pool.swap(true, I256::ONE, Some(*SQRT_PRICE_1_1)).await;
+    }
+
+    #[test]
+    fn issue74_fee_validation_and_identity() {
+        let pool = full_fee_test_pool(0, TICK_LIST.clone());
+        assert!(
+            pool.clone()
+                .with_fees(uint!(999999_U24), U24::ZERO)
+                .is_err()
+        );
+        for packed in [1001, 1001 << 12, 0xffffff] {
+            assert!(pool.clone().with_fees(pool.fee, U24::from(packed)).is_err());
+        }
+        let dynamic = Pool::new_with_tick_data_provider(
+            TOKEN0.clone().into(),
+            TOKEN1.clone().into(),
+            DYANMIC_FEE_FLAG,
+            10,
+            Address::with_last_byte(1),
+            *SQRT_PRICE_1_1,
+            0,
+            TICK_LIST.clone(),
+        )
+        .unwrap();
+        let resolved = dynamic
+            .clone()
+            .with_fees(uint!(3000_U24), uint!(1000_U24))
+            .unwrap();
+        assert_eq!(resolved.pool_key, dynamic.pool_key);
+        assert_eq!(resolved.pool_id, dynamic.pool_id);
+        assert_eq!(resolved.fee, DYANMIC_FEE_FLAG);
+        assert_ne!(resolved, dynamic);
+        assert_eq!(resolved.clone(), resolved);
+        assert!(dynamic.with_fees(uint!(1000001_U24), U24::ZERO).is_err());
+    }
+
+    #[tokio::test]
+    async fn issue74_full_fee_quotes_preserve_identity_and_state() {
+        let pool = full_fee_test_pool(ONE_ETHER, TICK_LIST.clone())
+            .with_fees(uint!(1_000_000_U24), U24::from(1000 + (500 << 12)))
+            .unwrap();
+        for token in [TOKEN0.clone(), TOKEN1.clone()] {
+            let (output, quoted) = pool
+                .get_output_amount(&CurrencyAmount::from_raw_amount(token, 100).unwrap(), None)
+                .await
+                .unwrap();
+            assert_eq!(output.quotient(), BigInt::from(0));
+            let mut expected = pool.clone();
+            // The zero-for-one word boundary at tick 0 is crossed at zero cost.
+            expected.tick_current = if output.currency == pool.currency1 {
+                -1
+            } else {
+                0
+            };
+            assert_eq!(quoted, expected);
+            assert_eq!(quoted.pool_id, pool.pool_id);
+            assert_eq!(quoted.pool_key, pool.pool_key);
+        }
+    }
+
+    #[test]
+    fn issue74_full_fee_pool_is_valid() {
+        Pool::new(
+            TOKEN0.clone().into(),
+            TOKEN1.clone().into(),
+            uint!(1_000_000_U24),
+            10,
+            Address::ZERO,
+            *SQRT_PRICE_1_1,
+            0,
+        )
+        .unwrap();
+    }
 
     mod constructor {
         use super::*;
@@ -479,7 +897,7 @@ mod tests {
             Pool::new(
                 Currency::Token(USDC.clone()),
                 Currency::Token(WETH.clone()),
-                uint!(1_000_000_U24),
+                uint!(1_000_001_U24),
                 10,
                 Address::ZERO,
                 *SQRT_PRICE_1_1,

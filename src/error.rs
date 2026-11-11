@@ -39,6 +39,15 @@ pub enum Error {
     #[error("Unsupported hook")]
     UnsupportedHook,
 
+    #[error("Dynamic LP fee has not been resolved")]
+    UnresolvedDynamicFee,
+
+    #[error("A 100% swap fee does not support exact output")]
+    InvalidFeeForExactOutput,
+
+    #[error("Invalid LP or protocol fee")]
+    InvalidFee,
+
     #[error("Insufficient liquidity")]
     InsufficientLiquidity,
 
